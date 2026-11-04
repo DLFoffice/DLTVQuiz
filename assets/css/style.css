@@ -1,0 +1,200 @@
+:root{
+  --space:#0a1140; --navy:#101a54; --blue:#2b3990; --blue2:#3d4fc4;
+  --y:#fbb900; --y2:#ffd54a; --ink:#17204d; --muted:#6b7398;
+  --ok:#17b26a; --bad:#ef4444; --card:#ffffff;
+  --ease:cubic-bezier(.65,0,.35,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  --stage-top:96px; --stage-h:310px; --stage-w:100%; --stage-l:0px; --space-top:420px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:'Sarabun',system-ui,sans-serif;color:#fff;background:var(--space);overflow-x:hidden;
+  background:radial-gradient(120% 80% at 50% -10%,#24338f 0%,#121c5c 45%,var(--space) 100%) fixed}
+button,input{font:inherit}
+img{max-width:100%}
+
+/* ---------- พื้นหลังอวกาศ ---------- */
+#sky,#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#sky{z-index:0}
+#confetti{z-index:50}
+.nebula{position:fixed;inset:-20%;z-index:0;pointer-events:none;opacity:.55;filter:blur(40px);
+  background:radial-gradient(30% 25% at 20% 30%,rgba(251,185,0,.18),transparent 70%),
+             radial-gradient(35% 30% at 80% 70%,rgba(80,120,255,.35),transparent 70%),
+             radial-gradient(25% 20% at 70% 15%,rgba(170,90,255,.22),transparent 70%);
+  animation:drift 26s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate3d(4%,-3%,0) rotate(6deg) scale(1.08)}}
+
+.app{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:12px 14px 40px;min-height:100vh}
+
+/* ---------- แถบโลโก้ ---------- */
+.topbar{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.96);color:var(--blue);
+  border-radius:20px;padding:8px 12px;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:dropIn .8s var(--spring) both}
+.logo-found{height:58px;width:auto}
+.logo-dltv{height:46px;width:auto;margin-left:auto}
+.topbar-text{display:flex;flex-direction:column;line-height:1.25;font-family:Kanit;min-width:0}
+.topbar-text strong{font-weight:600;font-size:clamp(12px,3.4vw,15px)}
+.topbar-text span{font-size:clamp(11px,3vw,13px);opacity:.8}
+@keyframes dropIn{from{transform:translateY(-30px);opacity:0}}
+
+/* ---------- เวทีน้อง 3D (ขยับตำแหน่งตามหน้าจอ) ---------- */
+.stage{position:absolute;z-index:3;top:var(--stage-top);left:var(--stage-l);width:var(--stage-w);height:var(--stage-h);
+  transition:top .8s var(--ease),left .8s var(--ease),width .8s var(--ease),height .8s var(--ease);cursor:grab}
+.stage:active{cursor:grabbing}
+.stage canvas{display:block;position:relative;z-index:1}
+.stage-ring{position:absolute;left:50%;bottom:2%;width:min(78%,300px);aspect-ratio:3/1;transform:translateX(-50%);
+  border-radius:50%;background:radial-gradient(closest-side,rgba(251,185,0,.35),rgba(251,185,0,.08) 60%,transparent);
+  animation:ringPulse 3s ease-in-out infinite}
+@keyframes ringPulse{50%{transform:translateX(-50%) scale(1.08);opacity:.7}}
+.stage-fallback{position:absolute;inset:0;margin:auto;height:92%;width:auto;object-fit:contain;animation:float 3s ease-in-out infinite;z-index:1}
+@keyframes float{50%{transform:translateY(-10px) rotate(2deg)}}
+
+/* --space-top = พื้นที่ใต้แถบโลโก้ที่เว้นไว้ให้น้อง DLTV */
+body[data-screen="home"]  {--stage-top:88px; --stage-h:min(44vh,340px); --space-top:calc(min(44vh,340px) + 6px)}
+body[data-screen="reg"]   {--stage-top:84px; --stage-h:170px; --space-top:176px}
+body[data-screen="quiz"]  {--stage-top:84px; --stage-h:132px; --stage-w:112px; --stage-l:calc(100% - 120px); --space-top:4px}
+body[data-screen="send"]  {--stage-top:110px; --stage-h:min(46vh,360px); --space-top:calc(min(46vh,360px) + 40px)}
+body[data-screen="result"]{--stage-top:84px; --stage-h:220px; --space-top:226px}
+body[data-screen="quiz"] .stage-ring{width:90%}
+
+/* ---------- บับเบิลคำพูด ---------- */
+.bubble{position:absolute;z-index:4;top:calc(var(--stage-top) + 6px);right:6%;max-width:46%;
+  background:#fff;color:var(--ink);font-family:Kanit;font-weight:500;font-size:15px;line-height:1.35;
+  padding:9px 14px;border-radius:16px 16px 16px 4px;box-shadow:0 8px 20px rgba(0,0,0,.25);
+  transform-origin:0 100%;opacity:0;transform:scale(.4) translateY(10px);pointer-events:none;
+  transition:opacity .25s,transform .35s var(--spring),top .8s var(--ease),right .8s var(--ease)}
+.bubble.show{opacity:1;transform:none}
+body[data-screen="quiz"] .bubble{right:128px;top:96px;border-radius:16px 16px 4px 16px;transform-origin:100% 100%;max-width:55%}
+
+/* ---------- หน้าจอ + transition ---------- */
+main{position:relative;padding-top:var(--space-top);transition:padding-top .8s var(--ease)}
+.screen{display:none}
+.screen.is-active{display:block}
+.screen.is-active [data-in]{animation:rise .7s var(--spring) both;animation-delay:calc(var(--i,0) * 70ms + 120ms)}
+.screen.is-leaving{display:block;animation:leave .35s var(--ease) both;pointer-events:none}
+@keyframes rise{from{opacity:0;transform:translateY(28px) scale(.96);filter:blur(6px)}}
+@keyframes leave{to{opacity:0;transform:translateY(-18px) scale(.97);filter:blur(6px)}}
+
+/* ---------- หน้าแรก ---------- */
+.title{font-family:Kanit;font-weight:700;text-align:center;margin:0 0 16px;font-size:clamp(28px,8vw,40px);line-height:1.15;
+  text-shadow:0 4px 18px rgba(0,0,0,.35)}
+.title span{background:linear-gradient(90deg,var(--y),#fff3b0,var(--y));-webkit-background-clip:text;background-clip:text;color:transparent;
+  background-size:200% 100%;animation:shine 3.5s linear infinite}
+@keyframes shine{to{background-position:-200% 0}}
+.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 18px}
+.chip{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:18px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.chip b{font-family:Kanit;font-size:24px;color:var(--y)}
+.chip small{font-size:13px;opacity:.85}
+.hint{text-align:center;font-size:13px;opacity:.6;margin:12px 0 0}
+
+/* ---------- ปุ่ม ---------- */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:18px;
+  padding:15px 22px;font-family:Kanit;font-weight:600;font-size:19px;cursor:pointer;overflow:hidden;
+  transition:transform .2s var(--spring),box-shadow .2s,filter .2s,opacity .2s}
+.btn:active{transform:translateY(3px) scale(.98)}
+.btn[disabled]{opacity:.55;pointer-events:none}
+.btn-go{width:100%;color:var(--navy);background:linear-gradient(180deg,var(--y2),var(--y));box-shadow:0 6px 0 #c98f00,0 14px 30px rgba(251,185,0,.35)}
+.btn-go:active{box-shadow:0 2px 0 #c98f00,0 6px 16px rgba(251,185,0,.3)}
+.btn-go::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.6) 50%,transparent 70%);
+  transform:translateX(-120%);animation:sweep 3s ease-in-out infinite 1s}
+@keyframes sweep{40%,100%{transform:translateX(120%)}}
+.btn-ghost{color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);flex:0 0 auto}
+.row{display:flex;gap:10px;margin-top:16px}
+.row .btn-go{flex:1}
+
+/* ---------- การ์ด ---------- */
+.card{background:var(--card);color:var(--ink);border-radius:26px;padding:22px 18px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.card h2{font-family:Kanit;font-weight:600;color:var(--blue);margin:0 0 14px;font-size:21px}
+
+/* ฟอร์ม floating label */
+.field{position:relative;margin:0 0 14px}
+.field input{width:100%;font-size:17px;padding:22px 16px 8px;border:2px solid #dfe3f3;border-radius:16px;background:#f7f8fd;outline:none;color:var(--ink);
+  transition:border-color .2s,box-shadow .2s,background .2s}
+.field input:focus{border-color:var(--blue2);background:#fff;box-shadow:0 0 0 4px rgba(61,79,196,.15)}
+.field label{position:absolute;left:18px;top:16px;color:var(--muted);pointer-events:none;transition:all .2s var(--ease)}
+.field input:focus+label,.field input:not(:placeholder-shown)+label{top:6px;font-size:12px;color:var(--blue2)}
+.field.err input{border-color:var(--bad);animation:shake .4s}
+.groups{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 8px}
+.groups button{border:2px solid #dfe3f3;background:#f7f8fd;color:var(--ink);border-radius:14px;padding:11px 8px;cursor:pointer;font-size:15px;
+  transition:all .25s var(--spring)}
+.groups button[aria-checked="true"]{border-color:var(--y);background:#fff8e0;transform:scale(1.03);box-shadow:0 6px 16px rgba(251,185,0,.25)}
+.groups.err{animation:shake .4s}
+.fine{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.card .btn-ghost{color:var(--blue);background:#eef0fa;border:0}
+
+/* ---------- คำถาม ---------- */
+.quiz-head{padding-right:118px;min-height:118px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.qcount{font-family:Kanit;display:flex;align-items:baseline;gap:6px}
+.qcount b{font-size:42px;line-height:1;color:var(--y);display:inline-block}
+.qcount b.pop{animation:pop .45s var(--spring)}
+.qcount small{opacity:.8}
+.track{height:12px;border-radius:99px;background:rgba(255,255,255,.14);overflow:visible;position:relative}
+.track-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,#ffe37a,var(--y));width:10%;position:relative;
+  transition:width .6s var(--spring);box-shadow:0 0 16px rgba(251,185,0,.6)}
+.sat{position:absolute;right:-14px;top:50%;transform:translateY(-55%);font-style:normal;font-size:22px;filter:drop-shadow(0 0 6px rgba(255,255,255,.6))}
+.qcard{min-height:300px;perspective:1000px}
+.qcard.out{animation:qOut .28s var(--ease) both}
+.qcard.out.back{animation-name:qOutBack}
+.qcard.in{animation:qIn .5s var(--spring) both}
+.qcard.in.back{animation-name:qInBack}
+.qcard.shake{animation:shake .45s}
+@keyframes qOut{to{opacity:0;transform:translateX(-60px) rotateY(18deg)}}
+@keyframes qOutBack{to{opacity:0;transform:translateX(60px) rotateY(-18deg)}}
+@keyframes qIn{from{opacity:0;transform:translateX(70px) rotateY(-18deg)}}
+@keyframes qInBack{from{opacity:0;transform:translateX(-70px) rotateY(18deg)}}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes pop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+.q{font-family:Kanit;font-weight:500;font-size:clamp(17px,4.6vw,20px);line-height:1.55;margin:0 0 16px;color:var(--navy)}
+.q u{text-decoration:none;background:linear-gradient(transparent 62%,rgba(251,185,0,.55) 0)}
+.choice{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;width:100%;text-align:left;font-size:16px;line-height:1.45;
+  background:#f6f7fd;border:2px solid #e3e6f5;border-radius:18px;padding:12px 14px;margin:0 0 10px;cursor:pointer;color:var(--ink);
+  transition:transform .25s var(--spring),border-color .2s,background .2s,box-shadow .2s;animation:rise .55s var(--spring) both;animation-delay:calc(var(--i) * 70ms + 120ms)}
+.choice:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(23,32,77,.08)}
+.choice .k{flex:0 0 36px;height:36px;border-radius:12px;background:#fff;border:2px solid #d6dbef;display:grid;place-items:center;
+  font-family:Kanit;font-weight:600;color:var(--blue);transition:all .3s var(--spring)}
+.choice.sel{border-color:var(--y);background:#fffaea;box-shadow:0 10px 24px rgba(251,185,0,.25);transform:scale(1.015)}
+.choice.sel .k{background:var(--y);border-color:var(--y);color:var(--navy);transform:rotate(-8deg) scale(1.1)}
+.ripple{position:absolute;border-radius:50%;background:rgba(251,185,0,.35);transform:scale(0);animation:ripple .6s ease-out forwards;pointer-events:none}
+@keyframes ripple{to{transform:scale(4);opacity:0}}
+
+/* ---------- ส่งคำตอบ ---------- */
+.sending{text-align:center;font-family:Kanit;font-size:18px}
+.orbit{position:relative;width:90px;height:90px;margin:0 auto 10px;border:2px dashed rgba(255,255,255,.3);border-radius:50%;animation:spin 2.2s linear infinite}
+.orbit i{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--y);top:-7px;left:calc(50% - 6px);box-shadow:0 0 12px var(--y)}
+.orbit i:nth-child(2){transform:rotate(120deg);transform-origin:6px 52px}
+.orbit i:nth-child(3){transform:rotate(240deg);transform-origin:6px 52px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- ผลลัพธ์ ---------- */
+.result{text-align:center}
+.result h2{margin-bottom:6px}
+.ring{position:relative;width:170px;height:170px;margin:4px auto 6px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:14;stroke-linecap:round}
+.ring .bg{stroke:#eef0fa}
+.ring .fg{stroke:url(#gradY);transition:stroke-dashoffset 1.6s var(--ease)}
+.ring.fail .fg{stroke:#93a0d6}
+.ring .val{position:absolute;inset:0;display:grid;place-items:center;font-family:Kanit;color:var(--navy)}
+.ring .val b{font-size:58px;line-height:1}
+.ring .val small{display:block;font-size:16px;color:var(--muted);margin-top:-6px}
+.badge{display:inline-block;padding:7px 16px;border-radius:99px;font-family:Kanit;font-weight:500;margin:6px 0 4px;animation:pop .6s var(--spring) both .9s}
+.badge.ok{background:#dcfce7;color:#0f8a50}.badge.bad{background:#eef0fa;color:var(--blue)}
+.ticket{position:relative;margin:14px auto 6px;max-width:360px;border-radius:18px;padding:16px;color:var(--navy);
+  background:linear-gradient(135deg,#fff3c4,var(--y2) 55%,var(--y));box-shadow:0 14px 30px rgba(251,185,0,.35);
+  animation:flipIn 1s var(--spring) both 1.2s;transform-origin:50% 0}
+.ticket::before,.ticket::after{content:"";position:absolute;top:50%;width:22px;height:22px;margin-top:-11px;border-radius:50%;background:#fff}
+.ticket::before{left:-11px}.ticket::after{right:-11px}
+.ticket small{display:block;font-size:13px;opacity:.8}
+.ticket b{display:block;font-family:Kanit;font-size:clamp(26px,8vw,34px);letter-spacing:2px;margin-top:2px}
+@keyframes flipIn{from{opacity:0;transform:perspective(600px) rotateX(-95deg)}}
+.muted{color:var(--muted);font-size:15px;line-height:1.6;margin:8px 0 0}
+
+/* ---------- อื่น ๆ ---------- */
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));z-index:60;transform:translate(-50%,30px);opacity:0;
+  background:rgba(10,17,64,.92);color:#fff;padding:11px 20px;border-radius:99px;font-family:Kanit;border:1px solid rgba(255,255,255,.2);
+  transition:all .35s var(--spring);pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.demo{position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:70;background:#ff7a00;color:#fff;font-size:12px;padding:3px 12px;border-radius:10px 10px 0 0;white-space:nowrap}
+.foot{text-align:center;font-size:12.5px;opacity:.5;margin-top:26px}
+
+@media (min-width:600px){ body[data-screen="home"]{--stage-h:360px;--space-top:366px} }
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

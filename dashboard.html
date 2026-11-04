@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สรุปผู้เข้าร่วมกิจกรรม DLTV</title>
+<link rel="icon" href="assets/img/dltv-logo.png">
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<script src="assets/js/config.js"></script>
+<style>
+  :root{--navy:#0b3d91;--sun:#ffc531;--orange:#f4a300;--bg:#f3f6fb;--ink:#1d2433;--muted:#66718a}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Sarabun,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--navy);color:#fff;padding:16px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  header h1{font-family:Kanit;font-size:20px;margin:0}
+  header .ctl{display:flex;gap:8px;align-items:center;font-size:14px}
+  select,button{font:inherit;padding:7px 10px;border-radius:8px;border:0}
+  button{background:var(--sun);color:var(--navy);font-weight:600;cursor:pointer}
+  main{max-width:1200px;margin:0 auto;padding:18px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .kpi .l{color:var(--muted);font-size:14px}.kpi .v{font-family:Kanit;font-size:30px;color:var(--navy)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px}
+  .box{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);min-width:0}
+  .box h3{font-family:Kanit;font-weight:500;margin:0 0 6px;font-size:17px;color:var(--navy)}
+  .chart{height:300px}
+  .full{grid-column:1/-1}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{padding:7px 8px;text-align:center;border-bottom:1px solid #eef1f6;white-space:nowrap}
+  th{background:#f6f8fc;font-weight:600}
+  td:first-child,th:first-child{text-align:left}
+  .scroll{overflow-x:auto}
+  .peak{font-size:14px;color:var(--muted);margin:0 0 8px}
+  .err{background:#fee2e2;color:#b91c1c;padding:16px;border-radius:12px}
+  .upd{opacity:.8;font-size:13px}
+  @media(max-width:520px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1><img src="assets/img/dltv-logo.png" alt="" style="height:28px;vertical-align:middle;background:#fff;border-radius:6px;padding:2px 4px;margin-right:6px">📊 สรุปผู้เข้าร่วมกิจกรรมตอบคำถามชิงตุ๊กตา DLTV</h1>
+  <div class="ctl">
+    <label>วันที่ <select id="fDate"><option value="">ทุกวัน</option></select></label>
+    <button onclick="load()">รีเฟรช</button>
+    <span class="upd" id="upd"></span>
+  </div>
+</header>
+<main id="main">
+  <form id="login" class="box" style="max-width:380px;margin:40px auto;text-align:center">
+    <h3>เข้าสู่หน้าสรุปผล</h3>
+    <p class="peak">กรอกรหัสผู้ดูแล (ADMIN_KEY) จากเมนู 🧸 DLTV Quiz ในชีต</p>
+    <input id="iKey" type="password" placeholder="ADMIN_KEY" style="width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;margin-bottom:10px">
+    <button style="width:100%">เข้าสู่ระบบ</button>
+  </form>
+</main>
+
+<script>
+var KEY=new URLSearchParams(location.search).get('key')||sessionStorage.getItem('dltvKey')||'', S=null, ready=false;
+var API=(window.DLTV_CONFIG||{}).API_URL;
+google.charts.load('current',{packages:['corechart']});
+google.charts.setOnLoadCallback(function(){ready=true;if(KEY)load()});
+setInterval(function(){if(KEY&&S)load()},60000); // อัปเดตอัตโนมัติทุก 1 นาที
+document.getElementById('fDate').onchange=render;
+document.getElementById('login').onsubmit=function(e){e.preventDefault();KEY=document.getElementById('iKey').value.trim();if(ready)load()};
+
+function load(){
+  if(!API){document.getElementById('main').innerHTML='<div class="err">ยังไม่ได้ตั้งค่า API_URL ใน assets/js/config.js</div>';return}
+  fetch(API+'?action=stats&key='+encodeURIComponent(KEY)).then(function(r){return r.json()}).then(function(j){
+    if(!j.ok)throw new Error(j.error);
+    sessionStorage.setItem('dltvKey',KEY);S=j.data;fillDates();render();
+  }).catch(function(e){
+    sessionStorage.removeItem('dltvKey');
+    if(!S){var m=document.getElementById('main');var err=m.querySelector('.err')||m.insertBefore(document.createElement('div'),m.firstChild);err.className='err';err.textContent=e.message}
+  });
+}
+function fillDates(){
+  var sel=document.getElementById('fDate'),cur=sel.value;
+  sel.innerHTML='<option value="">ทุกวัน</option>'+S.dates.map(function(d){return '<option value="'+d+'">'+thDate(d)+'</option>'}).join('');
+  sel.value=S.dates.indexOf(cur)>=0?cur:'';
+  document.getElementById('upd').textContent='อัปเดต '+S.updated;
+}
+function thDate(d){var p=d.split('-');return p.length===3?(+p[2])+'/'+(+p[1])+'/'+(+p[0]+543):d}
+function hl(h){return ('0'+h).slice(-2)+':00'}
+
+function render(){
+  if(!S)return;
+  var D=document.getElementById('fDate').value;
+  // records: [date,hour,group,score,passed,prize,phone]
+  var R=S.records.filter(function(r){return !D||r[0]===D});
+  var people={};R.forEach(function(r){people[r[6]]=1});
+  var plays=R.length,passed=sum(R,4),prizes=sum(R,5);
+
+  var html='<div class="kpis">'+
+    kpi('จำนวนครั้งที่เล่น',plays)+kpi('จำนวนคน (ไม่ซ้ำเบอร์)',Object.keys(people).length)+
+    kpi('ผ่านเกณฑ์ ≥'+S.passScore,passed)+kpi('% ผ่านเกณฑ์',plays?(passed/plays*100).toFixed(1)+'%':'-')+
+    kpi('ตุ๊กตาที่แจก',prizes)+kpi('คะแนนเฉลี่ย',plays?(sum(R,3)/plays).toFixed(2):'-')+'</div>';
+
+  // หาชั่วโมงพีค
+  var byH={};R.forEach(function(r){byH[r[1]]=(byH[r[1]]||0)+1});
+  var hs=Object.keys(byH).map(Number).sort(function(a,b){return a-b});
+  var peak=hs.slice().sort(function(a,b){return byH[b]-byH[a]})[0];
+
+  html+='<div class="grid">'+
+    '<div class="box full"><h3>จำนวนผู้เข้าร่วมรายวัน</h3><div id="cDay" class="chart"></div></div>'+
+    '<div class="box"><h3>ช่วงเวลาที่มาร่วมกิจกรรม'+(D?' ('+thDate(D)+')':' (รวมทุกวัน)')+'</h3>'+
+      (peak!==undefined?'<p class="peak">ช่วงที่คนมามากที่สุด: <b>'+hl(peak)+'-'+hl(peak+1)+'</b> ('+byH[peak]+' ครั้ง)</p>':'')+
+      '<div id="cHour" class="chart"></div></div>'+
+    '<div class="box"><h3>กลุ่มผู้เข้าร่วม</h3><div id="cGroup" class="chart"></div></div>'+
+    '<div class="box"><h3>การกระจายคะแนน</h3><div id="cScore" class="chart"></div></div>'+
+    '<div class="box"><h3>สรุปรายวัน</h3><div class="scroll">'+dayTable()+'</div></div>'+
+    '<div class="box full"><h3>ตารางความหนาแน่น วันที่ × ช่วงเวลา (จำนวนครั้งที่เล่น)</h3><div class="scroll">'+heatTable()+'</div></div>'+
+  '</div>';
+  document.getElementById('main').innerHTML=html;
+
+  var base={fontName:'Sarabun',legend:{position:'top'},chartArea:{left:50,right:20,top:40,bottom:50},colors:['#0b3d91','#f4a300','#16a34a']};
+
+  // รายวัน
+  var dd=[['วันที่','เล่นทั้งหมด','จำนวนคน','ได้ตุ๊กตา']];
+  S.byDate.forEach(function(r){dd.push([thDate(r.date),r.plays,r.people,r.prizes])});
+  if(dd.length>1) new google.visualization.ColumnChart(document.getElementById('cDay')).draw(google.visualization.arrayToDataTable(dd),base);
+  else empty('cDay');
+
+  // รายชั่วโมง
+  if(hs.length){
+    var hd=[['ช่วงเวลา','จำนวนครั้ง',{role:'style'}]];
+    for(var h=hs[0];h<=hs[hs.length-1];h++) hd.push([hl(h),byH[h]||0,h===peak?'#f4a300':'#0b3d91']);
+    new google.visualization.ColumnChart(document.getElementById('cHour')).draw(google.visualization.arrayToDataTable(hd),Object.assign({},base,{legend:'none'}));
+  } else empty('cHour');
+
+  // กลุ่ม
+  var g={};R.forEach(function(r){g[r[2]]=(g[r[2]]||0)+1});
+  var gd=[['กลุ่ม','จำนวน']];Object.keys(g).forEach(function(k){gd.push([k,g[k]])});
+  if(gd.length>1) new google.visualization.PieChart(document.getElementById('cGroup')).draw(google.visualization.arrayToDataTable(gd),
+    {fontName:'Sarabun',pieHole:.45,chartArea:{width:'90%',height:'80%'},colors:['#0b3d91','#f4a300','#16a34a','#38bdf8','#94a3b8']});
+  else empty('cGroup');
+
+  // คะแนน
+  var sc=[['คะแนน','จำนวน',{role:'style'}]];
+  for(var s=0;s<=10;s++) sc.push([String(s),R.filter(function(r){return r[3]===s}).length,s>=S.passScore?'#16a34a':'#94a3b8']);
+  if(plays) new google.visualization.ColumnChart(document.getElementById('cScore')).draw(google.visualization.arrayToDataTable(sc),Object.assign({},base,{legend:'none'}));
+  else empty('cScore');
+}
+
+function dayTable(){
+  if(!S.byDate.length)return '<p class="peak">ยังไม่มีข้อมูล</p>';
+  var t='<table><tr><th>วันที่</th><th>เล่น</th><th>คน</th><th>ผ่าน</th><th>แจก</th><th>รับแล้ว</th></tr>';
+  var T=[0,0,0,0,0];
+  S.byDate.forEach(function(r){T[0]+=r.plays;T[1]+=r.people;T[2]+=r.passed;T[3]+=r.prizes;T[4]+=r.received;
+    t+='<tr><td>'+thDate(r.date)+'</td><td>'+r.plays+'</td><td>'+r.people+'</td><td>'+r.passed+'</td><td>'+r.prizes+'</td><td>'+r.received+'</td></tr>'});
+  return t+'<tr><th>รวม</th><th>'+T.join('</th><th>')+'</th></tr></table>';
+}
+function heatTable(){
+  var hs=[];S.dates.forEach(function(d){Object.keys(S.matrix[d]||{}).forEach(function(h){hs.push(+h)})});
+  if(!hs.length)return '<p class="peak">ยังไม่มีข้อมูล</p>';
+  var a=Math.min.apply(null,hs),b=Math.max.apply(null,hs),mx=0;
+  S.dates.forEach(function(d){for(var h=a;h<=b;h++)mx=Math.max(mx,(S.matrix[d]||{})[h]||0)});
+  var t='<table><tr><th>วันที่</th>';for(var h=a;h<=b;h++)t+='<th>'+hl(h)+'</th>';t+='<th>รวม</th></tr>';
+  S.dates.forEach(function(d){var row=S.matrix[d]||{},tot=0;t+='<tr><td>'+thDate(d)+'</td>';
+    for(var h=a;h<=b;h++){var v=row[h]||0;tot+=v;var al=mx?v/mx:0;
+      t+='<td style="background:rgba(244,163,0,'+(al*.85).toFixed(2)+');'+(al>.6?'font-weight:600':'')+'">'+(v||'')+'</td>'}
+    t+='<th>'+tot+'</th></tr>'});
+  return t+'</table>';
+}
+function kpi(l,v){return '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div></div>'}
+function sum(a,i){return a.reduce(function(s,r){return s+(+r[i]||0)},0)}
+function empty(id){document.getElementById(id).innerHTML='<p class="peak">ยังไม่มีข้อมูล</p>'}
+</script>
+</body>
+</html>
