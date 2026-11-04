@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ระบบหลังบ้าน · สรุปผลกิจกรรม DLTV</title>
+  <link rel="icon" href="assets/img/dltv-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
+  <script src="assets/js/config.js"></script>
+</head>
+<body>
+  <!-- เข้าสู่ระบบ -->
+  <section id="login" class="login">
+    <form id="fLogin" class="login-card">
+      <div class="login-logos">
+        <img src="assets/img/foundation-logo.png" alt="ตรามูลนิธิการศึกษาทางไกลผ่านดาวเทียม">
+        <img src="assets/img/dltv-logo.png" alt="DLTV">
+      </div>
+      <h1>ระบบหลังบ้าน</h1>
+      <p>สรุปผลกิจกรรมตอบคำถามชิงตุ๊กตา DLTV</p>
+      <input id="iKey" type="password" placeholder="รหัสผู้ดูแล (ADMIN_KEY)" autocomplete="current-password" required>
+      <button type="submit" id="bLogin">เข้าสู่ระบบ</button>
+      <p class="login-err" id="loginErr"></p>
+    </form>
+  </section>
+
+  <!-- แดชบอร์ด -->
+  <div id="app" hidden>
+    <header class="bar">
+      <div class="bar-brand">
+        <img src="assets/img/dltv-logo.png" alt="">
+        <div><b>ระบบหลังบ้าน DLTV Quiz</b><small id="upd">-</small></div>
+      </div>
+      <div class="bar-ctl">
+        <select id="fDate" aria-label="เลือกวันที่"></select>
+        <button id="bRefresh" class="ghost" title="รีเฟรช">⟳ รีเฟรช</button>
+        <button id="bPdf" class="pdf">⬇ Export PDF</button>
+        <button id="bPrint" class="ghost" title="พิมพ์ หรือเลือก &quot;บันทึกเป็น PDF&quot;">🖨 พิมพ์</button>
+        <button id="bLogout" class="ghost" title="ออกจากระบบ">ออก</button>
+      </div>
+    </header>
+
+    <main id="report">
+      <!-- หัวรายงาน (แสดงเฉพาะใน PDF) -->
+      <div class="rp-head">
+        <img src="assets/img/foundation-logo.png" alt="">
+        <div>
+          <h1>รายงานสรุปผลกิจกรรมตอบคำถามชิงตุ๊กตา DLTV</h1>
+          <p>มูลนิธิการศึกษาทางไกลผ่านดาวเทียม ในพระบรมราชูปถัมภ์</p>
+          <p class="rp-meta" id="rpMeta"></p>
+        </div>
+        <img src="assets/img/dltv-logo.png" alt="">
+      </div>
+
+      <section class="kpis" id="kpis"></section>
+
+      <section class="grid">
+        <div class="box span2"><h3>📅 จำนวนผู้เข้าร่วมรายวัน</h3><div class="cv tall"><canvas id="cDay"></canvas></div></div>
+        <div class="box"><h3>⏰ ช่วงเวลาที่มาร่วมกิจกรรม</h3><p class="note" id="peak"></p><div class="cv"><canvas id="cHour"></canvas></div></div>
+        <div class="box"><h3>👥 กลุ่มผู้เข้าร่วม</h3><div class="cv"><canvas id="cGroup"></canvas></div></div>
+        <div class="box"><h3>🎯 การกระจายคะแนน</h3><div class="cv"><canvas id="cScore"></canvas></div></div>
+        <div class="box"><h3>✅ อัตราตอบถูกรายข้อ</h3><div class="cv"><canvas id="cQ"></canvas></div></div>
+        <div class="box span2 pb"><h3>🔥 ข้อที่ตอบผิดมากที่สุด</h3><div id="hard"></div></div>
+        <div class="box span2"><h3>🗓️ ความหนาแน่น วันที่ × ช่วงเวลา (จำนวนครั้ง)</h3><div class="scroll" id="heat"></div></div>
+        <div class="box span2"><h3>📊 สรุปรายวัน</h3><div class="scroll" id="daily"></div></div>
+        <div class="box span2" id="winBox">
+          <div class="box-head">
+            <h3>🧸 รายชื่อผู้ได้รับรางวัล <span class="count" id="winCount"></span></h3>
+            <div class="box-tools">
+              <input id="wSearch" type="search" placeholder="ค้นหาชื่อ / เบอร์ / รหัส">
+              <label class="chk"><input type="checkbox" id="mask" checked> ซ่อนเบอร์โทร</label>
+              <label class="chk"><input type="checkbox" id="incWin" checked> รวมใน PDF</label>
+            </div>
+          </div>
+          <div class="scroll" id="winners"></div>
+        </div>
+      </section>
+      <p class="rp-foot" id="rpFoot"></p>
+    </main>
+  </div>
+
+  <div id="busy" class="busy" hidden><div class="spin"></div><p id="busyText">กำลังสร้าง PDF…</p></div>
+  <script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

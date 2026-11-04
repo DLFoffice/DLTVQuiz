@@ -47,7 +47,7 @@
         <div class="chips" data-in>
           <div class="chip"><b id="hQ">10</b><small>คำถาม</small></div>
           <div class="chip"><b>≥ <span id="hPass">8</span></b><small>ข้อถูก รับเลย</small></div>
-          <div class="chip"><b>🧸</b><small>ตุ๊กตา DLTV</small></div>
+          <div class="chip chip-doll"><img src="assets/img/mascot.png" alt="" class="chip-ico"><small>ตุ๊กตา DLTV</small></div>
         </div>
         <button class="btn btn-go" id="bStart" data-in disabled><span>กำลังโหลด…</span></button>
         <p class="hint" data-in>แตะที่น้อง DLTV หรือปัดซ้าย-ขวาเพื่อหมุนตัว</p>
@@ -58,18 +58,18 @@
         <form id="fReg" class="card" autocomplete="on" novalidate>
           <h2 data-in>ลงทะเบียนก่อนเริ่มภารกิจ 🚀</h2>
           <div class="field" data-in>
-            <input id="iName" name="name" maxlength="100" placeholder=" " required>
-            <label for="iName">ชื่อ-สกุล</label>
+            <input id="iName" name="name" maxlength="100" placeholder=" " autocomplete="name" required>
+            <label for="iName">ชื่อ-สกุล (ไม่ต้องใส่คำนำหน้า)</label>
           </div>
           <div class="field" data-in>
-            <input id="iPhone" name="tel" type="tel" inputmode="numeric" maxlength="12" placeholder=" " required>
-            <label for="iPhone">เบอร์โทรศัพท์</label>
+            <input id="iPhone" name="tel" type="tel" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel" required>
+            <label for="iPhone">เบอร์มือถือ 10 หลัก</label>
           </div>
           <div class="groups" id="groups" data-in role="radiogroup" aria-label="ท่านเป็น"></div>
-          <p class="fine" data-in>* 1 เบอร์โทรศัพท์ รับรางวัลได้ 1 ครั้ง · ข้อมูลใช้เพื่อการจัดกิจกรรมเท่านั้น</p>
+          <p class="fine" data-in>* 1 คน (ชื่อ-สกุล / เบอร์โทรศัพท์) รับรางวัลได้ 1 ครั้ง · ข้อมูลใช้เพื่อการจัดกิจกรรมเท่านั้น</p>
           <div class="row" data-in>
             <button type="button" class="btn btn-ghost" data-back>ย้อนกลับ</button>
-            <button type="submit" class="btn btn-go"><span>เริ่มตอบคำถาม</span></button>
+            <button type="submit" class="btn btn-go" id="bReg"><span>เริ่มตอบคำถาม</span></button>
           </div>
         </form>
       </section>
@@ -104,7 +104,19 @@
       </section>
     </main>
 
-    <footer class="foot">DLTV · <span id="place"></span></footer>
+  </div>
+
+  <!-- กล่องแจ้งเตือน (เคยได้รางวัลแล้ว) -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+      <img src="assets/img/mascot.png" alt="" class="modal-ico">
+      <h3 id="mTitle">คุณได้รับรางวัลไปแล้ว</h3>
+      <p id="mText"></p>
+      <div class="row">
+        <button type="button" class="btn btn-ghost" id="mBack">กลับ</button>
+        <button type="button" class="btn btn-go" id="mGo"><span>เล่นเพื่อทดสอบความรู้</span></button>
+      </div>
+    </div>
   </div>
 
   <div id="demo" class="demo" hidden>โหมดทดลอง · ยังไม่ได้เชื่อมต่อ Google Apps Script</div>

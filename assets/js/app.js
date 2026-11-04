@@ -1,4 +1,4 @@
-import { getQuiz, submitQuiz, DEMO } from './api.js';
+import { getQuiz, submitQuiz, checkPlayer, DEMO } from './api.js';
 
 const $ = (s) => document.querySelector(s);
 const CFG = window.DLTV_CONFIG || {};
@@ -54,7 +54,6 @@ function toast(msg) {
 
 // ===================================================== หน้าแรก
 async function boot() {
-  $('#place').textContent = CFG.EVENT_PLACE || '';
   if (DEMO) $('#demo').hidden = false;
   initMascot();
   setTimeout(() => say('สวัสดีครับ! มาตอบคำถามกับน้อง DLTV กัน 🛰️'), 900);
@@ -88,22 +87,60 @@ $('#groups').addEventListener('click', (e) => {
 $('#iPhone').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d]/g, '').slice(0, 10); });
 document.querySelectorAll('.field input').forEach((i) => i.addEventListener('input', () => i.parentElement.classList.remove('err')));
 
-$('#fReg').addEventListener('submit', (e) => {
+// ตรวจรูปแบบชื่อ-สกุล (ตรงกับฝั่ง GAS)
+const NAME_PREFIX = /^(นาย|นางสาว|นาง|น\.ส\.|นส\.?|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|ดช\.?|ดญ\.?|mr\.?|mrs\.?|ms\.?|miss)\s*/i;
+function nameError(raw) {
+  const n = raw.replace(/\s+/g, ' ').trim().replace(NAME_PREFIX, '');
+  const parts = n.split(' ').filter(Boolean);
+  if (!n) return 'กรุณากรอกชื่อ-สกุล';
+  if (!/^[\u0E00-\u0E7Fa-zA-Z.\s'-]+$/.test(n)) return 'ชื่อ-สกุลต้องเป็นตัวอักษรไทยหรืออังกฤษเท่านั้น';
+  if (parts.length < 2 || parts.some((x) => x.length < 2)) return 'กรุณากรอกทั้งชื่อและนามสกุล (เว้นวรรค 1 ช่อง)';
+  return '';
+}
+
+$('#fReg').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = $('#iName').value.trim();
+  if (S.busy) return;
+  const name = $('#iName').value.replace(/\s+/g, ' ').trim();
   const phone = $('#iPhone').value.replace(/\D/g, '');
   const groupBtn = $('#groups [aria-checked="true"]');
   const fail = (el, msg) => { el.classList.remove('err'); void el.offsetWidth; el.classList.add('err'); toast(msg); mascot('play', 'shake'); };
   document.querySelectorAll('.field').forEach((f) => f.classList.remove('err'));
-  if (!name) return fail($('#iName').parentElement, 'กรุณากรอกชื่อ-สกุล');
-  if (!/^0\d{8,9}$/.test(phone)) return fail($('#iPhone').parentElement, 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง');
+  const ne = nameError(name);
+  if (ne) return fail($('#iName').parentElement, ne);
+  if (!/^0[689]\d{8}$/.test(phone)) return fail($('#iPhone').parentElement, 'กรุณากรอกเบอร์มือถือ 10 หลักให้ถูกต้อง');
   if (!groupBtn) return fail($('#groups'), 'กรุณาเลือกกลุ่มผู้เข้าร่วม');
   S.player = { name, phone, group: groupBtn.textContent };
+
+  // ตรวจชื่อ/เบอร์ซ้ำกับผู้ที่ได้รับรางวัลแล้ว
+  const btn = $('#bReg'), label = btn.querySelector('span').textContent;
+  S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = 'กำลังตรวจสอบ…';
+  try {
+    const r = await checkPlayer(name, phone);
+    if (r.alreadyWon) { showModal(r.reason); return; }
+    startQuiz();
+  } catch (err) {
+    toast(err.message); mascot('play', 'shake');
+  } finally {
+    S.busy = false; btn.disabled = false; btn.querySelector('span').textContent = label;
+  }
+});
+
+function startQuiz() {
   S.idx = 0; S.answers = {}; S.startedAt = Date.now();
   renderQ(false);
-  go('quiz'); mascot('play', 'spin');
+  go('quiz'); mascot('play', 'spin'); mascot('burst', 18);
   setTimeout(() => say('สู้ ๆ นะครับ! ✨', 1800), 800);
-});
+}
+
+function showModal(reason) {
+  $('#mText').innerHTML = esc(reason) + '<br>จึงไม่สามารถรับรางวัลซ้ำได้ แต่ยังร่วมสนุกทดสอบความรู้ได้นะครับ';
+  const m = $('#modal'); m.hidden = false; requestAnimationFrame(() => m.classList.add('show'));
+  mascot('play', 'shake');
+}
+function hideModal() { const m = $('#modal'); m.classList.remove('show'); setTimeout(() => (m.hidden = true), 300); }
+$('#mBack').addEventListener('click', hideModal);
+$('#mGo').addEventListener('click', () => { hideModal(); startQuiz(); });
 
 // ===================================================== คำถาม
 function renderQ(animate = true, back = false) {
@@ -114,7 +151,7 @@ function renderQ(animate = true, back = false) {
     $('#track').style.width = ((S.idx + 1) / n) * 100 + '%';
     $('#qText').innerHTML = q.question; // ข้อความจากผู้ดูแลระบบ (มีแท็ก <u>)
     $('#qChoices').innerHTML = q.choices.map((c, i) =>
-      `<button type="button" class="choice${S.answers[q.id] === i + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${i + 1}"><span class="k">${LETTERS[i]}</span><span>${esc(c)}</span></button>`).join('');
+      `<button type="button" class="choice c${i + 1}${S.answers[q.id] === i + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${i + 1}"><span class="k">${LETTERS[i]}</span><span>${esc(c)}</span></button>`).join('');
     $('#bPrev').style.visibility = S.idx ? 'visible' : 'hidden';
     $('#bNext span').textContent = S.idx === n - 1 ? 'ส่งคำตอบ ✔' : 'ถัดไป';
   };
@@ -178,7 +215,7 @@ function showResult(r) {
   const C = 2 * Math.PI * 70;
   let html = `<h2>ผลคะแนนของคุณ ${esc(S.player.name)}</h2>
     <div class="ring ${r.passed ? '' : 'fail'}">
-      <svg viewBox="0 0 170 170"><defs><linearGradient id="gradY" x1="0" x2="1"><stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
+      <svg viewBox="0 0 170 170"><defs><linearGradient id="gradY" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ffd23f"/><stop offset=".5" stop-color="#ff8a00"/><stop offset="1" stop-color="#ff4fa3"/></linearGradient></defs>
         <circle class="bg" cx="85" cy="85" r="70"/><circle class="fg" cx="85" cy="85" r="70" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
       <div class="val"><div><b id="scoreNum">0</b><small>จาก ${r.total}</small></div></div>
     </div>`;
@@ -193,8 +230,10 @@ function showResult(r) {
       <p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b><br>แวะดูข้อมูลที่บูธ DLTV แล้วกลับมาลองใหม่นะครับ</p>`;
   }
   if (r.demo) html += `<p class="muted">(โหมดทดลอง — ผลนี้เป็นตัวอย่าง)</p>`;
+  if (r.review) html += `<button class="btn btn-review" id="bReview" aria-expanded="false"><span>📋 ดูเฉลยคำตอบ</span></button><div class="review" id="review" hidden></div>`;
   html += `<div class="row"><button class="btn btn-go" id="bAgain"><span>${r.prize ? 'กลับหน้าแรก' : 'เล่นอีกครั้ง'}</span></button></div>`;
   $('#result').innerHTML = html;
+  if (r.review) $('#bReview').onclick = () => toggleReview(r);
   go('result');
 
   setTimeout(() => {
@@ -204,7 +243,7 @@ function showResult(r) {
 
   if (r.prize) {
     mascot('setMood', 'happy'); mascot('play', 'happy');
-    setTimeout(() => { confetti(); say('เย้! เก่งที่สุดเลย 🎉', 3500); }, 900);
+    setTimeout(() => { confetti(); mascot('burst', 50); say('เย้! เก่งที่สุดเลย 🎉', 3500); }, 900);
     setTimeout(confetti, 2300);
   } else if (r.passed) {
     mascot('play', 'jump'); say('เก่งมากครับ!', 2500);
@@ -216,6 +255,31 @@ function showResult(r) {
     $('#fReg').reset(); [...$('#groups').children].forEach((x) => x.setAttribute('aria-checked', 'false'));
     mascot('setMood', 'idle'); go('home'); mascot('play', 'wave');
   };
+}
+
+// ===================================================== เฉลย
+function toggleReview(r) {
+  const box = $('#review'), btn = $('#bReview');
+  const open = box.hidden;
+  btn.setAttribute('aria-expanded', String(open));
+  btn.querySelector('span').textContent = open ? '🔼 ซ่อนเฉลย' : '📋 ดูเฉลยคำตอบ';
+  if (!open) { box.classList.remove('open'); setTimeout(() => (box.hidden = true), 250); return; }
+  const right = r.review.filter((x) => x.your === x.correct).length;
+  box.innerHTML = `<div class="rv-sum"><span class="ok">✔ ถูก ${right} ข้อ</span><span class="bad">✘ ผิด ${r.review.length - right} ข้อ</span></div>` +
+    r.review.map((x, i) => {
+      const q = S.quiz.questions.find((qq) => qq.id === x.id) || { question: '', choices: [] };
+      const ok = x.your === x.correct;
+      const opt = (n) => (n ? `${LETTERS[n - 1]}. ${esc(q.choices[n - 1] || '')}` : 'ไม่ได้ตอบ');
+      return `<article class="rv ${ok ? 'ok' : 'bad'}" style="--i:${i}">
+        <header><span class="rv-no">${i + 1}</span><span class="rv-tag">${ok ? 'ถูก' : 'ผิด'}</span></header>
+        <p class="rv-q">${q.question}</p>
+        ${ok ? `<p class="rv-a good">✔ ${opt(x.your)}</p>`
+             : `<p class="rv-a wrong">✘ คำตอบของคุณ: ${opt(x.your)}</p><p class="rv-a good">✔ เฉลย: ${opt(x.correct)}</p>`}
+      </article>`;
+    }).join('');
+  box.hidden = false; requestAnimationFrame(() => box.classList.add('open'));
+  setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+  mascot('play', 'nod');
 }
 
 function countUp(el, to, ms) {
@@ -254,7 +318,8 @@ function cfTick() {
   const resize = () => {
     W = c.width = innerWidth * devicePixelRatio; H = c.height = innerHeight * devicePixelRatio;
     stars = Array.from({ length: Math.round((innerWidth * innerHeight) / 5000) }, () => ({
-      x: Math.random() * W, y: Math.random() * H, r: (Math.random() * 1.3 + 0.3) * devicePixelRatio, p: Math.random() * 6, s: 0.5 + Math.random() * 1.5, z: Math.random() }));
+      x: Math.random() * W, y: Math.random() * H, r: (Math.random() * 1.4 + 0.3) * devicePixelRatio, p: Math.random() * 6, s: 0.5 + Math.random() * 1.5, z: Math.random(),
+      c: ['#ffffff', '#ffffff', '#ffffff', '#ffe27a', '#ff9bd2', '#8be9ff', '#c4a8ff'][(Math.random() * 7) | 0] }));
   };
   resize(); addEventListener('resize', resize);
   let my = 0; addEventListener('scroll', () => (my = scrollY), { passive: true });
@@ -262,7 +327,7 @@ function cfTick() {
     g.clearRect(0, 0, W, H);
     stars.forEach((s) => {
       const a = 0.35 + 0.65 * Math.abs(Math.sin(t / 1000 * s.s + s.p));
-      g.globalAlpha = a; g.fillStyle = s.z > 0.92 ? '#ffe9a6' : '#fff';
+      g.globalAlpha = a; g.fillStyle = s.c;
       g.beginPath(); g.arc(s.x, (s.y - my * s.z * 0.3 * devicePixelRatio + H) % H, s.r, 0, 7); g.fill();
     });
     if (!shoot && Math.random() < 0.004) shoot = { x: Math.random() * W * 0.7, y: Math.random() * H * 0.3, l: 0 };

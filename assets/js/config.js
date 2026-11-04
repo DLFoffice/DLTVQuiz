@@ -4,5 +4,4 @@
 window.DLTV_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbwueQey1Bu90uFPhbAnxR2pbJJfmOz7FQ01qBIgXQUbso_RoT4lH6wY-KvY2Fpvdapc/exec',
   EVENT_NAME: 'ตอบคำถามชิงตุ๊กตา DLTV',
-  EVENT_PLACE: 'หัวหิน',
 };

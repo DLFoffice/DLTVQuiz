@@ -1,4 +1,4 @@
-// เชื่อมต่อ Google Apps Script API (ถ้ายังไม่ตั้ง API_URL จะใช้โหมดทดลอง)
+// เชื่อมต่อ Google Apps Script API (ถ้ายังไม่ตั้ง API_URL ใน config.js จะใช้โหมดทดลอง)
 const CFG = window.DLTV_CONFIG || {};
 export const DEMO = !CFG.API_URL;
 
@@ -8,8 +8,7 @@ const DEMO_QUIZ = {
  "groups": [
   "นักเรียน/นักศึกษา",
   "ครู/บุคลากรทางการศึกษา",
-  "ผู้ปกครอง/บุคคลทั่วไป",
-  "นักท่องเที่ยว"
+  "ผู้ปกครอง/บุคคลทั่วไป"
  ],
  "questions": [
   {
@@ -79,7 +78,7 @@ const DEMO_QUIZ = {
     "กว่า 15,000 แห่ง",
     "กว่า 20,000 แห่ง",
     "กว่า 25,000 แห่ง",
-    "กว่า 31,000 แห่ง"
+    "กว่า 33,000 แห่ง"
    ]
   },
   {
@@ -88,7 +87,7 @@ const DEMO_QUIZ = {
    "choices": [
     "กว่า 1,000,000 คน",
     "กว่า 1,200,000 คน",
-    "กว่า 1,500,000 คน",
+    "กว่า 2,300,000 คน",
     "กว่า 3,000,000 คน"
    ]
   },
@@ -118,7 +117,7 @@ const DEMO_QUIZ = {
 async function call(method, params, body) {
   const url = new URL(CFG.API_URL);
   Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
-  // ส่งเป็น text/plain เพื่อไม่ให้เกิด CORS preflight กับ Apps Script
+  // POST แบบ text/plain (ค่าเริ่มต้นของ fetch) เพื่อไม่ให้เกิด CORS preflight กับ Apps Script
   const res = await fetch(url, method === 'POST' ? { method, body: JSON.stringify(body), redirect: 'follow' } : { redirect: 'follow' });
   if (!res.ok) throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ (' + res.status + ')');
   const json = await res.json();
@@ -131,10 +130,21 @@ export async function getQuiz() {
   return call('GET', { action: 'quiz' });
 }
 
+/** ตรวจว่าชื่อ/เบอร์นี้เคยได้รางวัลแล้วหรือยัง */
+export async function checkPlayer(name, phone) {
+  if (DEMO) { await wait(500); return { alreadyWon: false, reason: '' }; }
+  return call('POST', {}, { action: 'check', name, phone });
+}
+
 export async function submitQuiz(payload) {
   if (DEMO) {
-    await new Promise((r) => setTimeout(r, 1400));
-    return { score: 9, total: 10, passed: true, prize: true, code: 'DLTV-DEMO-001', note: '', wrong: [5], passScore: 8, demo: true };
+    await wait(1400);
+    // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบผิดข้อ 5
+    const review = DEMO_QUIZ.questions.map((q) => {
+      const your = payload.answers[q.id] || null;
+      return { id: q.id, your, correct: q.id === 5 ? (your % 4) + 1 : your };
+    });
+    return { score: 9, total: 10, passed: true, prize: true, code: 'DLTV-DEMO-001', note: '', wrong: [5], passScore: 8, review, demo: true };
   }
   return call('POST', {}, { action: 'submit', ...payload });
 }
@@ -143,3 +153,5 @@ export async function getStats(key) {
   if (DEMO) throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน assets/js/config.js');
   return call('GET', { action: 'stats', key });
 }
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
