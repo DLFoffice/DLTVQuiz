@@ -2,9 +2,10 @@
 const CFG = window.DLTV_CONFIG || {};
 export const DEMO = !CFG.API_URL;
 
-// ข้อคำถามสำหรับโหมดทดลองเท่านั้น (ไม่มีเฉลย — เฉลยอยู่ใน GAS ฝั่งเซิร์ฟเวอร์)
-const DEMO_QUIZ = {
- "passScore": 8,
+// ข้อคำถาม (ไม่มีเฉลย — เฉลยอยู่ใน GAS ฝั่งเซิร์ฟเวอร์)
+// โหลดจากไฟล์นี้โดยตรงเพื่อลดภาระ GAS — ถ้าแก้ข้อคำถาม ต้องแก้ทั้งที่นี่และใน Code.gs ให้ตรงกัน
+const QUIZ = {
+ "passScore": 10,
  "groups": [
   "นักเรียน/นักศึกษา",
   "ครู/บุคลากรทางการศึกษา",
@@ -114,20 +115,36 @@ const DEMO_QUIZ = {
  ]
 };
 
-async function call(method, params, body) {
+async function call(method, params, body, tries = 4) {
   const url = new URL(CFG.API_URL);
   Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
-  // POST แบบ text/plain (ค่าเริ่มต้นของ fetch) เพื่อไม่ให้เกิด CORS preflight กับ Apps Script
-  const res = await fetch(url, method === 'POST' ? { method, body: JSON.stringify(body), redirect: 'follow' } : { redirect: 'follow' });
-  if (!res.ok) throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ (' + res.status + ')');
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'เกิดข้อผิดพลาด');
-  return json.data;
+  for (let i = 1; ; i++) {
+    let retry = false, err;
+    try {
+      // POST แบบ text/plain (ค่าเริ่มต้นของ fetch) เพื่อไม่ให้เกิด CORS preflight กับ Apps Script
+      const res = await fetch(url, method === 'POST' ? { method, body: JSON.stringify(body), redirect: 'follow' } : { redirect: 'follow' });
+      if (!res.ok) { retry = res.status === 429 || res.status >= 500; throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ (' + res.status + ')'); }
+      const json = await res.json();
+      if (json.ok) return json.data;
+      retry = /^BUSY:|too many|Service invoked/i.test(json.error || '');
+      throw new Error((json.error || 'เกิดข้อผิดพลาด').replace(/^BUSY:\s*/, ''));
+    } catch (e) {
+      err = e;
+      if (e instanceof TypeError) retry = true; // เน็ตหลุด / timeout
+    }
+    if (!retry || i >= tries) throw err;
+    await wait(800 * 2 ** (i - 1) + Math.random() * 600); // รอแล้วลองใหม่: ~1, 2, 4 วินาที
+  }
+}
+
+/** ช่วงเวลาปัจจุบัน + ตุ๊กตาคงเหลือ (เรียกตอนเปิดหน้าเว็บ — ช่วยปลุกเซิร์ฟเวอร์ GAS ด้วย) */
+export async function getStatus() {
+  if (DEMO) return { slot: 2, slotLabel: '15.00–16.59 น.', dollsLeft: 3, dollsPerSlot: 5 };
+  return call('GET', { action: 'status' }, null, 2);
 }
 
 export async function getQuiz() {
-  if (DEMO) return structuredClone(DEMO_QUIZ);
-  return call('GET', { action: 'quiz' });
+  return structuredClone(QUIZ);
 }
 
 /** ตรวจว่าชื่อ/เบอร์นี้เคยได้รางวัลแล้วหรือยัง */
@@ -138,15 +155,30 @@ export async function checkPlayer(name, phone) {
 
 export async function submitQuiz(payload) {
   if (DEMO) {
-    await wait(1400);
-    // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบผิดข้อ 5
-    const review = DEMO_QUIZ.questions.map((q) => {
-      const your = payload.answers[q.id] || null;
-      return { id: q.id, your, correct: q.id === 5 ? (your % 4) + 1 : your };
-    });
-    return { score: 9, total: 10, passed: true, prize: true, code: 'DLTV-DEMO-001', note: '', wrong: [5], passScore: 8, review, demo: true };
+    await wait(1200);
+    // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบถูกทุกข้อ
+    const review = QUIZ.questions.map((q) => ({ id: q.id, your: payload.answers[q.id] || null, correct: payload.answers[q.id] || null }));
+    return { score: 10, total: 10, perfect: true, passScore: 10, wrong: [], review, demo: true,
+      reward: { already: '', expect: 'doll', dollsLeft: 3, slotLabel: '15.00–16.59 น.', why: '' } };
   }
   return call('POST', {}, { action: 'submit', ...payload });
+}
+
+/** ขอรับรางวัล: ตุ๊กตา (10 คะแนน + มีโควตา) หรือรางวัลปลอบใจ */
+export async function claimReward(submitId, demoType = 'doll') {
+  if (DEMO) {
+    await wait(700);
+    return demoType === 'doll'
+      ? { claimed: true, type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-S3-01', note: '', slotLabel: '15.00–16.59 น.' }
+      : { claimed: true, type: 'gift', reward: 'รางวัลปลอบใจ', code: 'GIFT-DEMO-001', note: '', slotLabel: '15.00–16.59 น.' };
+  }
+  return call('POST', {}, { action: 'claim', submitId });
+}
+
+/** ส่งแบบสอบถามความพึงพอใจ */
+export async function submitSurvey(payload) {
+  if (DEMO) { await wait(700); return { saved: true }; }
+  return call('POST', {}, { action: 'survey', ...payload });
 }
 
 export async function getStats(key) {

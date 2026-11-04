@@ -1,12 +1,12 @@
-// ระบบหลังบ้าน: ดึงสถิติจาก GAS → แสดงแดชบอร์ด + สร้างรายงาน PDF (A4)
+// ระบบหลังบ้าน: ดึงสถิติจาก GAS → แดชบอร์ด (กรองช่วงวันที่/ช่วงเวลา) + รายงาน PDF (A4)
 import { getStats } from './api.js';
 
 const $ = (s) => document.querySelector(s);
 const LETTERS = ['ก', 'ข', 'ค', 'ง'];
-// สีโทนสุภาพ
 const C = { navy: '#2b3990', teal: '#2a9d8f', amber: '#d99a2b', rose: '#c8576f', slate: '#94a3b8', green: '#3a9d6a', violet: '#7466b8', sky: '#4f86c6' };
 const SERIES = [C.navy, C.teal, C.amber, C.rose, C.violet, C.sky, '#64748b'];
 const GROUP_COLORS = [C.navy, C.teal, C.amber, C.rose, C.slate];
+const LEVEL_COLORS = ['#3a9d6a', '#8bbf5a', '#e0b54a', '#e08a4a', '#c8576f']; // 5 → 1
 const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 let KEY = sessionStorage.getItem('dltvKey') || '';
@@ -25,8 +25,10 @@ if (window.Chart) {
 $('#fLogin').addEventListener('submit', (e) => { e.preventDefault(); KEY = $('#iKey').value.trim(); load(true); });
 $('#bLogout').onclick = () => { sessionStorage.removeItem('dltvKey'); location.reload(); };
 $('#bRefresh').onclick = () => load();
-$('#fDate').onchange = render;
+['#fFrom', '#fTo', '#fSlot'].forEach((id) => ($(id).onchange = () => { markQuick(''); fixRange(); render(); }));
+$('#fQuick').onclick = (e) => { const b = e.target.closest('button'); if (b) quick(b.dataset.q); };
 $('#wSearch').oninput = renderWinners;
+$('#wType').onchange = renderWinners;
 $('#mask').onchange = renderWinners;
 $('#bPdf').onclick = exportPdf;
 if (KEY) load(true);
@@ -37,81 +39,128 @@ async function load(first) {
     S = await getStats(KEY);
     sessionStorage.setItem('dltvKey', KEY);
     $('#login').hidden = true; $('#app').hidden = false;
-    fillDates(); render();
+    fillFilters(first); render();
     clearInterval(timer); timer = setInterval(() => { if (!exporting) load(); }, 60000);
   } catch (e) {
     if (first || !S) { $('#login').hidden = false; $('#app').hidden = true; $('#loginErr').textContent = e.message; sessionStorage.removeItem('dltvKey'); }
   } finally { $('#bLogin').disabled = false; }
 }
 
-function fillDates() {
-  const sel = $('#fDate'), cur = sel.value;
+// ===================================================== ตัวกรอง
+const allDates = () => [...new Set([].concat(S.plays, S.claims, S.surveys).map((r) => r[0]))].sort();
+const today = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); // เวลาไทย
+const slotLabels = () => S.slots.map((s) => s.label).concat([S.outsideLabel]);
+const OUT = () => S.slots.length; // index ของ "นอกช่วงเวลา" ในกราฟ/ตาราง
+const slotKey = (i) => (i < 0 ? OUT() : i);
+
+function fillFilters(first) {
   const dates = allDates();
-  sel.innerHTML = `<option value="">ทุกวัน (${dates.length} วัน)</option>` + dates.map((d) => `<option value="${d}">${thDate(d)}</option>`).join('');
-  sel.value = dates.includes(cur) ? cur : '';
+  const opts = dates.map((d) => `<option value="${d}">${thDate(d)}</option>`).join('') || '<option value="">-</option>';
+  const keep = [$('#fFrom').value, $('#fTo').value];
+  $('#fFrom').innerHTML = opts; $('#fTo').innerHTML = opts;
+  const sl = $('#fSlot').value;
+  $('#fSlot').innerHTML = '<option value="">ทุกช่วงเวลา</option>' + slotLabels().map((l, i) => `<option value="${i}">${l}</option>`).join('');
+  $('#fSlot').value = sl;
+  if (first || !dates.includes(keep[0])) { $('#fFrom').value = dates[0] || ''; $('#fTo').value = dates[dates.length - 1] || ''; markQuick('all'); }
+  else { $('#fFrom').value = keep[0]; $('#fTo').value = dates.includes(keep[1]) ? keep[1] : dates[dates.length - 1]; }
   $('#upd').textContent = 'ข้อมูล ณ ' + thStamp(S.updated) + ' · รีเฟรชอัตโนมัติทุก 1 นาที';
+}
+function quick(q) {
+  const dates = allDates(); if (!dates.length) return;
+  let d1 = dates[0], d2 = dates[dates.length - 1];
+  if (q === 'today') d1 = d2 = today();
+  if (q === 'yesterday') { const y = new Date(Date.now() + 7 * 3600e3 - 864e5).toISOString().slice(0, 10); d1 = d2 = y; }
+  if (!dates.includes(d1)) { toastNo(q === 'today' ? 'วันนี้' : 'เมื่อวาน'); return; }
+  $('#fFrom').value = d1; $('#fTo').value = d2; markQuick(q); render();
+}
+function toastNo(w) { $('#fSum').textContent = 'ยังไม่มีข้อมูลของ' + w; setTimeout(render, 1600); }
+function markQuick(q) { [...$('#fQuick').children].forEach((b) => b.classList.toggle('on', b.dataset.q === q)); }
+function fixRange() { if ($('#fFrom').value > $('#fTo').value) $('#fTo').value = $('#fFrom').value; }
+
+function filt() {
+  const from = $('#fFrom').value, to = $('#fTo').value, sl = $('#fSlot').value;
+  const ok = (r) => r[0] >= from && r[0] <= to && (sl === '' || slotKey(r[1]) === +sl);
+  return { from, to, sl, ok, dates: allDates().filter((d) => d >= from && d <= to) };
 }
 
 // ===================================================== คำนวณสถิติ (ใช้ร่วมกันทั้งหน้าจอและ PDF)
-// record = [date, hour, group, score, passed, prize, phone, mask, seconds, received]
-const allDates = () => [...new Set(S.records.map((r) => r[0]))].sort();
+// plays:   [date, slot, group, score, phone, mask, seconds]
+// claims:  [date, slot, 'doll'|'gift', group, score, received, name, phone, code, time]
+// surveys: [date, slot, 'p'|'v', group, [r1..r7], suggestion, time]
+function compute() {
+  const F = filt();
+  const P = S.plays.filter(F.ok), CL = S.claims.filter(F.ok), SV = S.surveys.filter(F.ok);
+  const labels = slotLabels(), nS = labels.length;
+  const usedSlots = labels.map((_, i) => i).filter((i) => i < OUT() || [].concat(S.plays, S.claims).some((r) => r[1] < 0));
+  const shownSlots = F.sl === '' ? usedSlots : [+F.sl];
+  const people = new Set(P.map((r) => r[4])).size;
+  const perfect = P.filter((r) => r[3] >= S.passScore).length;
+  const dolls = CL.filter((r) => r[2] === 'doll').length, gifts = CL.filter((r) => r[2] === 'gift').length;
+  const received = CL.filter((r) => r[5]).length;
 
-function compute(D) {
-  const R = S.records.filter((r) => !D || r[0] === D);
-  const n = R.length, people = new Set(R.map((r) => r[6])).size;
-  const passed = sum(R, 4), prizes = sum(R, 5), received = sum(R, 9);
-  const dates = allDates(), showDates = D ? [D] : dates;
-
-  // ช่วงชั่วโมง (ใช้ช่วงเดียวกันทุกวัน)
-  const hs = S.records.map((r) => r[1]);
-  const h0 = hs.length ? Math.min(...hs) : 8, h1 = hs.length ? Math.max(...hs) : 17;
-  const hours = []; for (let h = h0; h <= h1; h++) hours.push(h);
-  const cell = {}; S.records.forEach((r) => { const k = r[0] + '|' + r[1]; cell[k] = (cell[k] || 0) + 1; });
-  const byH = hours.map((h) => R.filter((r) => r[1] === h).length);
-  const peakIdx = byH.indexOf(Math.max(...byH, 0));
-
-  const perDay = dates.map((d) => {
-    const x = S.records.filter((r) => r[0] === d);
-    return { d, n: x.length, p: new Set(x.map((r) => r[6])).size, pass: sum(x, 4), w: sum(x, 5), rec: sum(x, 9) };
+  // ต่อวัน
+  const perDay = F.dates.map((d) => {
+    const p = P.filter((r) => r[0] === d), c = CL.filter((r) => r[0] === d), s = SV.filter((r) => r[0] === d);
+    return { d, n: p.length, people: new Set(p.map((r) => r[4])).size, perfect: p.filter((r) => r[3] >= S.passScore).length,
+      dolls: c.filter((r) => r[2] === 'doll').length, gifts: c.filter((r) => r[2] === 'gift').length, rec: c.filter((r) => r[5]).length,
+      sv: s.length, sat: s.length ? mean(s.map(rowMean)) : null };
   });
+  // ต่อช่วงเวลา
+  const bySlot = (arr, d) => labels.map((_, i) => arr.filter((r) => (!d || r[0] === d) && slotKey(r[1]) === i).length);
+  const slotTot = bySlot(P);
+  const peakI = shownSlots.reduce((a, i) => (slotTot[i] > (slotTot[a] || 0) ? i : a), shownSlots[0]);
+  const quota = F.dates.map((d) => ({ d, given: S.slots.map((_, i) => S.claims.filter((r) => r[0] === d && r[1] === i && r[2] === 'doll').length) }));
 
-  const groups = {}; R.forEach((r) => (groups[r[2]] = (groups[r[2]] || 0) + 1));
-  const scores = []; for (let i = 0; i <= S.questions.length; i++) scores.push(R.filter((r) => r[3] === i).length);
-
+  const groups = {};
+  P.forEach((r) => (groups[r[2]] = (groups[r[2]] || 0) + 1));
+  SV.filter((r) => r[2] === 'v').forEach((r) => (groups[r[3]] = (groups[r[3]] || 0) + 1));
+  const scores = []; for (let i = 0; i <= S.questions.length; i++) scores.push(P.filter((r) => r[3] === i).length);
   const qs = S.questions.map((q, i) => {
-    const cnt = [0, 0, 0, 0, 0]; R.forEach((r) => cnt[Number(r[7][i]) || 0]++);
-    const answered = n - cnt[0];
+    const cnt = [0, 0, 0, 0, 0]; P.forEach((r) => cnt[Number(r[5][i]) || 0]++);
+    const answered = P.length - cnt[0];
     return { q, i, cnt, answered, rate: answered ? cnt[q.answer] / answered : 0 };
   });
-  const hard = [...qs].filter((x) => x.answered).sort((a, b) => a.rate - b.rate).slice(0, 3).map((x) => {
-    const wrong = [1, 2, 3, 4].filter((k) => k !== x.q.answer).sort((a, b) => x.cnt[b] - x.cnt[a])[0];
-    return { ...x, wrong };
-  });
+  const hard = [...qs].filter((x) => x.answered).sort((a, b) => a.rate - b.rate).slice(0, 3)
+    .map((x) => ({ ...x, wrong: [1, 2, 3, 4].filter((k) => k !== x.q.answer).sort((a, b) => x.cnt[b] - x.cnt[a])[0] }));
 
-  return {
-    D, R, n, people, passed, prizes, received, dates, showDates, hours, cell, byH,
-    peak: byH[peakIdx] ? hours[peakIdx] : null, peakN: byH[peakIdx] || 0,
-    perDay: perDay.filter((x) => !D || x.d === D), perDayAll: perDay, groups, scores, qs, hard,
-    avg: n ? sum(R, 3) / n : 0, secs: n ? sum(R, 8) / n : 0,
-    winners: S.winners.filter((w) => !D || w.date === D),
-  };
+  // แบบสอบถาม
+  const items = S.surveyItems.map((t, i) => {
+    const v = SV.map((r) => r[4][i]).filter((x) => x >= 1);
+    const dist = [5, 4, 3, 2, 1].map((k) => v.filter((x) => x === k).length);
+    return { t, i, n: v.length, mean: v.length ? mean(v) : 0, sd: sd(v), dist };
+  });
+  const allR = SV.flatMap((r) => r[4].filter((x) => x >= 1));
+  const svAll = { n: SV.length, p: SV.filter((r) => r[2] === 'p').length, v: SV.filter((r) => r[2] === 'v').length, mean: allR.length ? mean(allR) : 0, sd: sd(allR) };
+  const sug = SV.filter((r) => r[5]).sort((a, b) => (b[0] + b[6]).localeCompare(a[0] + a[6]));
+
+  return { F, P, CL, SV, labels, nS, shownSlots, people, perfect, dolls, gifts, received, perDay, bySlot, slotTot, peakI, quota,
+    groups, scores, qs, hard, items, svAll, sug, avg: P.length ? mean(P.map((r) => r[3])) : 0, secs: P.length ? mean(P.map((r) => r[6])) : 0 };
+}
+const rowMean = (r) => mean(r[4].filter((x) => x >= 1));
+function level(m) { return m >= 4.51 ? [5, 'มากที่สุด'] : m >= 3.51 ? [4, 'มาก'] : m >= 2.51 ? [3, 'ปานกลาง'] : m >= 1.51 ? [2, 'น้อย'] : [1, 'น้อยที่สุด']; }
+
+function rangeText(st) {
+  const F = st.F, d = F.from === F.to ? 'วันที่ ' + thDate(F.from) : `${thDate(F.from)} – ${thDate(F.to)} (${F.dates.length} วัน)`;
+  return d + ' · ' + (F.sl === '' ? 'ทุกช่วงเวลา' : 'ช่วง ' + st.labels[+F.sl]);
 }
 
 function kpiList(st) {
+  const quotaMax = st.F.dates.length * S.slots.reduce((a, s) => a + s.dolls, 0) / (st.F.sl === '' ? 1 : S.slots.length);
+  const lv = level(st.svAll.mean);
   return [
-    [C.navy, 'จำนวนครั้งที่เล่น', fmt(st.n), st.D ? thDate(st.D) : `รวม ${st.dates.length} วัน`],
-    [C.sky, 'จำนวนคน (ไม่ซ้ำเบอร์)', fmt(st.people), st.n ? (st.n / Math.max(st.people, 1)).toFixed(2) + ' ครั้ง/คน' : '-'],
-    [C.green, 'ผ่านเกณฑ์ ≥ ' + S.passScore + ' คะแนน', fmt(st.passed), st.n ? pct(st.passed / st.n) + ' ของผู้เล่น' : '-'],
-    [C.amber, 'ตุ๊กตาที่แจก', fmt(st.prizes), S.dailyLimit ? `จำกัด ${S.dailyLimit} ตัว/วัน` : 'ไม่จำกัดจำนวน'],
-    [C.teal, 'รับตุ๊กตาแล้ว', fmt(st.received), 'รอรับ ' + Math.max(st.prizes - st.received, 0)],
-    [C.violet, 'คะแนนเฉลี่ย', st.avg.toFixed(2), 'จาก ' + S.questions.length + ' คะแนน'],
-    [C.rose, 'เวลาเฉลี่ยที่ใช้', fmtSec(st.secs), 'ต่อการเล่น 1 ครั้ง'],
-    [C.slate, 'ช่วงเวลาที่คนมากที่สุด', st.peak !== null ? `${hl(st.peak)}–${hl(st.peak + 1)}` : '-', st.peakN ? st.peakN + ' ครั้ง' : ''],
+    [C.navy, 'ผู้เล่นเกม', fmt(st.P.length) + ' ครั้ง', fmt(st.people) + ' คน (ไม่ซ้ำเบอร์)'],
+    [C.green, 'ได้คะแนนเต็ม 10', fmt(st.perfect), st.P.length ? pct(st.perfect / st.P.length) + ' ของผู้เล่น' : '-'],
+    [C.amber, 'แจกตุ๊กตา DLTV', `${fmt(st.dolls)} / ${fmt(Math.round(quotaMax))}`, 'ตามโควตาของช่วงที่เลือก'],
+    [C.rose, 'รางวัลปลอบใจ', fmt(st.gifts), 'ชิ้น'],
+    [C.teal, 'รับของแล้ว', `${fmt(st.received)} / ${fmt(st.CL.length)}`, 'รอรับ ' + Math.max(st.CL.length - st.received, 0)],
+    [C.violet, 'ตอบแบบสอบถาม', fmt(st.svAll.n) + ' คน', `ผู้เล่น ${st.svAll.p} · ผู้เยี่ยมชม ${st.svAll.v}`],
+    [C.sky, 'ความพึงพอใจเฉลี่ย', st.svAll.n ? st.svAll.mean.toFixed(2) : '-', st.svAll.n ? 'ระดับ' + lv[1] + ` (S.D. ${st.svAll.sd.toFixed(2)})` : 'ยังไม่มีข้อมูล'],
+    [C.slate, 'ช่วงเวลาที่คนเล่นมากที่สุด', st.slotTot[st.peakI] ? st.labels[st.peakI].replace(' น.', '') : '-', st.slotTot[st.peakI] ? st.slotTot[st.peakI] + ' ครั้ง' : ''],
   ];
 }
 const kpiHtml = (list) => list.map(([c, l, v, s]) => `<div class="kpi" style="--c:${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
 
-// ===================================================== กราฟ (แบบเส้นโค้ง)
+// ===================================================== กราฟ
 function area(color, alpha = 0.14) {
   return (ctx) => {
     const { chart: c } = ctx; if (!c.chartArea) return hexA(color, alpha);
@@ -129,53 +178,79 @@ function lineOpts(legend = true, xTitle, yTitle) {
     scales: { x: { grid: { display: false }, title: { display: !!xTitle, text: xTitle } },
               y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef0f3' }, border: { display: false }, title: { display: !!yTitle, text: yTitle } } } };
 }
-
-function cfgHour(st) {
-  // หลายวัน: 1 เส้นต่อวัน / เลือกวันเดียว: เส้นเดียว + จุดสูงสุด
-  const many = !st.D && st.dates.length > 1;
-  const datasets = many
-    ? st.dates.map((d, i) => curve(thDate(d), st.hours.map((h) => st.cell[d + '|' + h] || 0), SERIES[i % SERIES.length], { fill: false, pointRadius: 3 }))
-    : [curve('จำนวนครั้งที่เล่น', st.byH, C.navy, {
-        pointRadius: st.hours.map((h) => (h === st.peak ? 7 : 3.5)),
-        pointBackgroundColor: st.hours.map((h) => (h === st.peak ? C.amber : '#fff')),
-        pointBorderColor: st.hours.map((h) => (h === st.peak ? C.amber : C.navy)) })];
-  if (many) datasets.push(curve('รวมทุกวัน', st.byH, C.slate, { borderDash: [6, 5], fill: false, pointRadius: 0, borderWidth: 2 }));
-  return { type: 'line', data: { labels: st.hours.map((h) => hl(h) + ' น.'), datasets }, options: lineOpts(true, '', 'จำนวนครั้ง') };
+function cfgSlot(st) {
+  const idx = st.F.sl === '' ? st.shownSlots : st.shownSlots, labels = idx.map((i) => st.labels[i].replace(' น.', ''));
+  const many = st.F.dates.length > 1 && st.F.dates.length <= 7;
+  const ds = many
+    ? st.F.dates.map((d, k) => { const v = st.bySlot(st.P, d); return curve(thDate(d), idx.map((i) => v[i]), SERIES[k % SERIES.length], { fill: false, pointRadius: 3 }); })
+    : [];
+  ds.push(curve(many ? 'รวมทุกวันที่เลือก' : 'จำนวนครั้งที่เล่น', idx.map((i) => st.slotTot[i]), many ? C.slate : C.navy,
+    many ? { borderDash: [6, 5], fill: false, pointRadius: 0, borderWidth: 2 } : {
+      pointRadius: idx.map((i) => (i === st.peakI ? 7 : 3.5)), pointBackgroundColor: idx.map((i) => (i === st.peakI ? C.amber : '#fff')),
+      pointBorderColor: idx.map((i) => (i === st.peakI ? C.amber : C.navy)) }));
+  ds.push(curve('ได้ตุ๊กตา', idx.map((i) => st.bySlot(st.CL.filter((r) => r[2] === 'doll'))[i]), C.amber, { fill: false, borderWidth: 2 }));
+  return { type: 'line', data: { labels, datasets: ds }, options: lineOpts(true, '', 'จำนวน') };
 }
 function cfgDay(st) {
-  const P = st.perDayAll, labels = P.map((x) => thDate(x.d));
-  if (P.length < 2) { // มีวันเดียว: ใช้แท่งแทนเส้น
-    return { type: 'bar', data: { labels, datasets: [
-      { label: 'จำนวนครั้งที่เล่น', data: P.map((x) => x.n), backgroundColor: hexA(C.navy, 0.85), borderRadius: 6, maxBarThickness: 60 },
-      { label: 'จำนวนคน', data: P.map((x) => x.p), backgroundColor: hexA(C.teal, 0.85), borderRadius: 6, maxBarThickness: 60 },
-      { label: 'ได้ตุ๊กตา', data: P.map((x) => x.w), backgroundColor: hexA(C.amber, 0.85), borderRadius: 6, maxBarThickness: 60 }] }, options: lineOpts(true) };
+  const D = st.perDay, labels = D.map((x) => thDate(x.d));
+  if (D.length < 2) {
+    const bar = (l, k, c) => ({ label: l, data: D.map((x) => x[k]), backgroundColor: hexA(c, 0.85), borderRadius: 6, maxBarThickness: 46 });
+    return { type: 'bar', data: { labels, datasets: [bar('ผู้เล่นเกม', 'n', C.navy), bar('ตุ๊กตา', 'dolls', C.amber), bar('รางวัลปลอบใจ', 'gifts', C.rose), bar('แบบสอบถาม', 'sv', C.teal)] }, options: lineOpts(true) };
   }
   return { type: 'line', data: { labels, datasets: [
-    curve('จำนวนครั้งที่เล่น', P.map((x) => x.n), C.navy),
-    curve('จำนวนคน', P.map((x) => x.p), C.teal, { fill: false }),
-    curve('ได้ตุ๊กตา', P.map((x) => x.w), C.amber, { fill: false })] }, options: lineOpts(true) };
+    curve('ผู้เล่นเกม', D.map((x) => x.n), C.navy),
+    curve('ตุ๊กตา', D.map((x) => x.dolls), C.amber, { fill: false }),
+    curve('รางวัลปลอบใจ', D.map((x) => x.gifts), C.rose, { fill: false }),
+    curve('แบบสอบถาม', D.map((x) => x.sv), C.teal, { fill: false })] }, options: lineOpts(true) };
 }
 function cfgScore(st) {
   const pass = S.passScore;
-  return { type: 'line', data: { labels: st.scores.map((_, i) => String(i)), datasets: [curve('จำนวนคน', st.scores, C.teal, {
-      pointBackgroundColor: st.scores.map((_, i) => (i >= pass ? C.green : '#fff')), pointBorderColor: st.scores.map((_, i) => (i >= pass ? C.green : C.teal)) })] },
-    options: { ...lineOpts(false, 'คะแนน', 'จำนวนคน'), plugins: { legend: { display: false },
-      tooltip: { callbacks: { title: (c) => c[0].label + ' คะแนน' + (+c[0].label >= pass ? ' (ผ่านเกณฑ์)' : '') } } } } };
+  return { type: 'line', data: { labels: st.scores.map((_, i) => String(i)), datasets: [curve('จำนวนครั้ง', st.scores, C.teal, {
+      pointBackgroundColor: st.scores.map((_, i) => (i >= pass ? C.green : '#fff')), pointBorderColor: st.scores.map((_, i) => (i >= pass ? C.green : C.teal)),
+      pointRadius: st.scores.map((_, i) => (i >= pass ? 6 : 3.5)) })] },
+    options: { ...lineOpts(false, 'คะแนน', 'จำนวนครั้ง'), plugins: { legend: { display: false },
+      tooltip: { callbacks: { title: (c) => c[0].label + ' คะแนน' + (+c[0].label >= pass ? ' (คะแนนเต็ม)' : '') } } } } };
 }
 function cfgGroup(st) {
   return { type: 'doughnut', data: { labels: Object.keys(st.groups), datasets: [{ data: Object.values(st.groups), backgroundColor: GROUP_COLORS, borderColor: '#fff', borderWidth: 2 }] },
-    options: { maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right' },
-      tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw} (${pct(c.raw / Math.max(st.n, 1))})` } } } } };
+    options: { maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right' } } } };
 }
 function cfgQ(st) {
   return { type: 'bar', data: { labels: st.qs.map((x) => 'ข้อ ' + (x.i + 1)), datasets: [{ label: '% ตอบถูก', data: st.qs.map((x) => +(x.rate * 100).toFixed(1)), borderRadius: 4, barThickness: 14,
-      backgroundColor: st.qs.map((x) => (x.rate >= 0.8 ? hexA(C.green, 0.85) : x.rate >= 0.6 ? hexA(C.amber, 0.85) : hexA(C.rose, 0.85))) }] },
+      backgroundColor: st.qs.map((x) => hexA(x.rate >= 0.8 ? C.green : x.rate >= 0.6 ? C.amber : C.rose, 0.85)) }] },
     options: { maintainAspectRatio: false, indexAxis: 'y',
       scales: { x: { min: 0, max: 100, ticks: { callback: (v) => v + '%' }, grid: { color: '#eef0f3' }, border: { display: false } }, y: { grid: { display: false } } },
       plugins: { legend: { display: false }, tooltip: { callbacks: { title: (c) => wrap(st.qs[c[0].dataIndex].q.question), label: (c) => ` ตอบถูก ${c.raw}%` } } } } };
 }
+function cfgSv(st) {
+  return { type: 'bar', data: { labels: st.items.map((x) => 'ข้อ ' + (x.i + 1)), datasets: [{ label: 'ค่าเฉลี่ย', data: st.items.map((x) => +x.mean.toFixed(2)), borderRadius: 4, barThickness: 14,
+      backgroundColor: st.items.map((x) => LEVEL_COLORS[5 - level(x.mean)[0]]) }] },
+    options: { maintainAspectRatio: false, indexAxis: 'y',
+      scales: { x: { min: 0, max: 5, ticks: { stepSize: 1 }, grid: { color: '#eef0f3' }, border: { display: false } }, y: { grid: { display: false } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: (c) => wrap(st.items[c[0].dataIndex].t), label: (c) => ` ค่าเฉลี่ย ${c.raw} (${level(c.raw)[1]})` } } } } };
+}
+function cfgSvDist(st) {
+  const names = ['มากที่สุด (5)', 'มาก (4)', 'ปานกลาง (3)', 'น้อย (2)', 'น้อยที่สุด (1)'];
+  return { type: 'bar', data: { labels: st.items.map((x) => 'ข้อ ' + (x.i + 1)), datasets: names.map((n, k) => ({ label: n, backgroundColor: LEVEL_COLORS[k],
+      data: st.items.map((x) => (x.n ? +((x.dist[k] / x.n) * 100).toFixed(1) : 0)), barThickness: 14 })) },
+    options: { maintainAspectRatio: false, indexAxis: 'y',
+      scales: { x: { stacked: true, max: 100, ticks: { callback: (v) => v + '%' }, grid: { color: '#eef0f3' }, border: { display: false } }, y: { stacked: true, grid: { display: false } } },
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } }, tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.raw}%` } } } } };
+}
 
 // ===================================================== ตาราง (ใช้ร่วมกัน)
+function quotaHtml(st) {
+  if (!st.quota.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
+  const idx = st.F.sl === '' ? S.slots.map((_, i) => i) : (+st.F.sl < S.slots.length ? [+st.F.sl] : []);
+  if (!idx.length) return '<p class="empty">นอกช่วงเวลากิจกรรมไม่มีการแจกตุ๊กตา</p>';
+  return '<table><tr><th class="l">วันที่</th>' + idx.map((i) => `<th>${S.slots[i].label}</th>`).join('') + '<th>รวม</th></tr>' +
+    st.quota.map((q) => {
+      let tot = 0, max = 0;
+      const cells = idx.map((i) => { const g = q.given[i], m = S.slots[i].dolls; tot += g; max += m;
+        return `<td class="q-cell"><span class="q-num">${g}</span> / ${m}<div class="q-bar"><i class="${g >= m ? 'full' : ''}" style="width:${Math.min(100, (g / m) * 100)}%"></i></div></td>`; }).join('');
+      return `<tr><td class="l">${thDate(q.d)}</td>${cells}<td><b>${tot}</b> / ${max}</td></tr>`;
+    }).join('') + '</table>';
+}
 function hardHtml(st) {
   if (!st.hard.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
   return '<div class="hard">' + st.hard.map((x) => `<article>
@@ -184,48 +259,61 @@ function hardHtml(st) {
     <p class="rightpick">เฉลย: ${LETTERS[x.q.answer - 1]}. ${esc(x.q.choices[x.q.answer - 1])}</p>
     <p class="wrongpick">ตอบผิดบ่อยที่สุด: ${LETTERS[x.wrong - 1]}. ${esc(x.q.choices[x.wrong - 1])} (${x.cnt[x.wrong]} คน)</p></article>`).join('') + '</div>';
 }
-function heatHtml(st) {
-  if (!S.records.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
-  let mx = 0; st.showDates.forEach((d) => st.hours.forEach((h) => (mx = Math.max(mx, st.cell[d + '|' + h] || 0))));
-  let t = '<table><tr><th class="l">วันที่</th>' + st.hours.map((h) => `<th>${hl(h)}</th>`).join('') + '<th>รวม</th></tr>';
-  st.showDates.forEach((d) => {
-    let tot = 0;
-    t += `<tr><td class="l">${thDate(d)}</td>` + st.hours.map((h) => { const v = st.cell[d + '|' + h] || 0; tot += v; return `<td style="${heat(v / (mx || 1))}">${v || ''}</td>`; }).join('') + `<td><b>${tot}</b></td></tr>`;
-  });
-  return t + '</table>';
+function svTableHtml(st) {
+  if (!st.svAll.n) return '<p class="empty">ยังไม่มีผู้ตอบแบบสอบถาม</p>';
+  const row = (no, t, x) => { const lv = level(x.mean); return `<tr><td>${no}</td><td class="l">${esc(t)}</td>${x.dist.map((d) => `<td>${d}</td>`).join('')}
+    <td class="mean">${x.mean.toFixed(2)}</td><td>${x.sd.toFixed(2)}</td><td><span class="lvl l${lv[0]}">${lv[1]}</span></td></tr>`; };
+  const tot = { mean: st.svAll.mean, sd: st.svAll.sd, dist: [0, 1, 2, 3, 4].map((k) => st.items.reduce((a, x) => a + x.dist[k], 0)) };
+  return `<table class="sv-tbl"><tr><th>ข้อ</th><th class="l">รายการประเมิน</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>x̄</th><th>S.D.</th><th>ระดับ</th></tr>` +
+    st.items.map((x) => row(x.i + 1, x.t, x)).join('') + `<tr class="tot">${row('', 'ภาพรวม', tot).slice(4)}` + '</table>';
+}
+function sugHtml(list, limit) {
+  const L = limit ? list.slice(0, limit) : list;
+  return L.length ? L.map((r) => `<article><small>${thDate(r[0])} ${esc(r[6])} น. · ${r[2] === 'p' ? 'ผู้เล่นกิจกรรม' : 'ผู้เยี่ยมชมบูธ'} · ${esc(r[3])}</small>${esc(r[5])}</article>`).join('')
+    : '<p class="empty">ยังไม่มีข้อเสนอแนะ</p>';
 }
 function dailyHtml(st) {
-  const rows = st.perDay;
-  if (!rows.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
-  const T = rows.reduce((a, x) => [a[0] + x.n, a[1] + x.pass, a[2] + x.w, a[3] + x.rec], [0, 0, 0, 0]);
-  return `<table><tr><th class="l">วันที่</th><th>เล่น (ครั้ง)</th><th>จำนวนคน</th><th>ผ่านเกณฑ์</th><th>% ผ่าน</th><th>แจกตุ๊กตา</th><th>รับแล้ว</th></tr>` +
-    rows.map((x) => `<tr><td class="l">${thDate(x.d)}</td><td>${x.n}</td><td>${x.p}</td><td>${x.pass}</td><td>${pct(x.pass / Math.max(x.n, 1))}</td><td>${x.w}</td><td>${x.rec}</td></tr>`).join('') +
-    (rows.length > 1 ? `<tr class="tot"><td class="l">รวม</td><td>${T[0]}</td><td>${st.people}</td><td>${T[1]}</td><td>${pct(T[1] / Math.max(T[0], 1))}</td><td>${T[2]}</td><td>${T[3]}</td></tr>` : '') + '</table>';
+  const R = st.perDay; if (!R.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
+  const sum = (k) => R.reduce((a, x) => a + x[k], 0);
+  const sat = st.svAll.n ? st.svAll.mean.toFixed(2) : '-';
+  return `<table><tr><th class="l">วันที่</th><th>ผู้เล่นเกม</th><th>จำนวนคน</th><th>คะแนนเต็ม</th><th>ตุ๊กตา</th><th>รางวัลปลอบใจ</th><th>รับของแล้ว</th><th>แบบสอบถาม</th><th>ความพึงพอใจ</th></tr>` +
+    R.map((x) => `<tr><td class="l">${thDate(x.d)}</td><td>${x.n}</td><td>${x.people}</td><td>${x.perfect}</td><td>${x.dolls}</td><td>${x.gifts}</td><td>${x.rec}</td><td>${x.sv}</td><td>${x.sat === null ? '-' : x.sat.toFixed(2)}</td></tr>`).join('') +
+    (R.length > 1 ? `<tr class="tot"><td class="l">รวม</td><td>${sum('n')}</td><td>${st.people}</td><td>${sum('perfect')}</td><td>${sum('dolls')}</td><td>${sum('gifts')}</td><td>${sum('rec')}</td><td>${sum('sv')}</td><td>${sat}</td></tr>` : '') + '</table>';
 }
 function winnersHtml(W, mask, start = 0) {
-  return `<table><tr><th>#</th><th class="l">วันที่ / เวลา</th><th class="l">ชื่อ-สกุล</th><th>เบอร์โทร</th><th class="l">กลุ่ม</th><th>คะแนน</th><th>รหัสรางวัล</th><th>สถานะ</th></tr>` +
-    W.map((w, i) => `<tr><td>${start + i + 1}</td><td class="l">${thDate(w.date)} ${esc(w.time).slice(0, 5)}</td><td class="l">${esc(w.name)}</td>
-      <td>${phone(w.phone, mask)}</td><td class="l">${esc(w.group)}</td><td>${w.score}</td><td><b>${esc(w.code)}</b></td>
-      <td>${w.received ? '<span class="pill ok">รับแล้ว</span>' : '<span class="pill wait">รอรับ</span>'}</td></tr>`).join('') + '</table>';
+  return `<table><tr><th>#</th><th class="l">วันที่ / เวลา</th><th class="l">ช่วงเวลา</th><th class="l">ชื่อ-สกุล</th><th>เบอร์โทร</th><th class="l">กลุ่ม</th><th>คะแนน</th><th class="l">รางวัล</th><th>รหัสรางวัล</th><th>สถานะ</th></tr>` +
+    W.map((w, i) => `<tr><td>${start + i + 1}</td><td class="l">${thDate(w[0])} ${esc(w[9])}</td><td class="l">${esc(slotLabels()[slotKey(w[1])])}</td><td class="l">${esc(w[6])}</td>
+      <td>${phone(w[7], mask)}</td><td class="l">${esc(w[3])}</td><td>${w[4]}</td><td class="l">${w[2] === 'doll' ? 'ตุ๊กตา DLTV' : 'รางวัลปลอบใจ'}</td><td><b>${esc(w[8])}</b></td>
+      <td>${w[5] ? '<span class="pill ok">รับแล้ว</span>' : '<span class="pill wait">รอรับ</span>'}</td></tr>`).join('') + '</table>';
 }
 
 // ===================================================== แสดงผลบนหน้าจอ
 function render() {
-  const st = compute($('#fDate').value);
+  const st = compute();
+  $('#fSum').textContent = rangeText(st);
   $('#kpis').innerHTML = kpiHtml(kpiList(st));
-  $('#peak').innerHTML = st.peak !== null ? `ช่วงที่คนมามากที่สุด <b>${hl(st.peak)}–${hl(st.peak + 1)} น.</b> (${st.peakN} ครั้ง)` : '';
-  draw('cHour', cfgHour(st)); draw('cDay', cfgDay(st)); draw('cScore', cfgScore(st)); draw('cGroup', cfgGroup(st)); draw('cQ', cfgQ(st));
+  $('#peak').innerHTML = st.slotTot[st.peakI] ? `ช่วงที่คนเล่นมากที่สุด <b>${st.labels[st.peakI]}</b> (${st.slotTot[st.peakI]} ครั้ง)` : '';
+  draw('cSlot', cfgSlot(st)); draw('cDay', cfgDay(st)); draw('cScore', cfgScore(st)); draw('cGroup', cfgGroup(st)); draw('cQ', cfgQ(st));
+  draw('cSv', cfgSv(st)); draw('cSvDist', cfgSvDist(st));
+  $('#quota').innerHTML = quotaHtml(st);
   $('#hard').innerHTML = hardHtml(st);
-  $('#heat').innerHTML = heatHtml(st);
+  $('#svNote').innerHTML = st.svAll.n ? `ผู้ตอบ ${st.svAll.n} คน · ค่าเฉลี่ยรวม <b>${st.svAll.mean.toFixed(2)}</b> (${level(st.svAll.mean)[1]})` : '';
+  $('#svTable').innerHTML = svTableHtml(st);
+  $('#sugCount').textContent = st.sug.length + ' รายการ';
+  $('#sug').innerHTML = sugHtml(st.sug);
   $('#daily').innerHTML = dailyHtml(st);
   renderWinners();
 }
+function winnersList() {
+  const q = $('#wSearch').value.trim().toLowerCase(), t = $('#wType').value;
+  return compute().CL.filter((w) => (!t || w[2] === t) && (!q || [w[6], w[7], w[8]].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (a[0] + a[9]).localeCompare(b[0] + b[9]));
+}
 function renderWinners() {
   if (!S) return;
-  const q = $('#wSearch').value.trim().toLowerCase();
-  const W = compute($('#fDate').value).winners.filter((w) => !q || [w.name, w.phone, w.code].join(' ').toLowerCase().includes(q));
+  const W = winnersList();
   $('#winCount').textContent = W.length + ' คน';
-  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked) : '<p class="empty">ยังไม่มีผู้ได้รับรางวัล</p>';
+  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked) : '<p class="empty">ยังไม่มีผู้ขอรับรางวัล</p>';
 }
 function draw(id, cfg) {
   if (!window.Chart) return;
@@ -234,7 +322,7 @@ function draw(id, cfg) {
 }
 
 // ===================================================== Export PDF
-// สร้างรายงานแยก (กว้าง 760px) → จับภาพทีละส่วน → วางลง A4 เอง เพื่อไม่ให้ส่วนใดถูกตัดครึ่งหน้า
+// สร้างรายงานแยก (กว้าง 760px) → จับภาพทีละส่วน → วางลง A4 เอง (ไม่มีส่วนใดถูกตัดครึ่งหน้า)
 async function exportPdf() {
   if (!S || exporting) return;
   if (!window.html2canvas || !window.jspdf) { alert('โหลดไลบรารีสร้าง PDF ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); return; }
@@ -242,72 +330,72 @@ async function exportPdf() {
   const root = $('#pdfRoot'), made = [];
   const scrollY = window.scrollY; window.scrollTo(0, 0);
   try {
-    const st = compute($('#fDate').value);
-    const range = st.D ? 'วันที่ ' + thDate(st.D) : 'รวมทุกวัน' + (st.dates.length ? ` (${thDate(st.dates[0])} – ${thDate(st.dates[st.dates.length - 1])})` : '');
-    const meta = `ข้อมูล: ${range} · ข้อมูล ณ ${thStamp(S.updated)}`;
-    const chartBox = (id, h, title, note = '') => `<div class="panel"><h2>${title}</h2>${note ? `<p>${note}</p>` : ''}<canvas id="${id}" width="${id === 'pHour' ? 734 : 346}" height="${h}"></canvas></div>`;
-
+    const st = compute();
+    const meta = `ข้อมูล: ${rangeText(st)} · ข้อมูล ณ ${thStamp(S.updated)}`;
+    const box = (id, w, h, title, note = '') => `<div class="panel"><h2>${title}</h2>${note ? `<p>${note}</p>` : ''}<canvas id="${id}" width="${w}" height="${h}"></canvas></div>`;
     let html = `
       <div data-block="first" class="rp-head">
         <img src="assets/img/foundation-logo.png" alt="">
-        <div><h1>รายงานสรุปผลกิจกรรมตอบคำถามชิงตุ๊กตา DLTV</h1>
+        <div><h1>รายงานสรุปผลกิจกรรมตอบคำถามชิงตุ๊กตา DLTV<br>และความพึงพอใจต่อการจัดแสดงนิทรรศการ</h1>
           <p>มูลนิธิการศึกษาทางไกลผ่านดาวเทียม ในพระบรมราชูปถัมภ์</p><p class="meta">${meta}</p></div>
         <img class="dl" src="assets/img/dltv-logo.png" alt="">
       </div>
-      <div data-block="run" class="rp-run"><b>รายงานสรุปผลกิจกรรมตอบคำถามชิงตุ๊กตา DLTV</b><span>${meta}</span></div>
+      <div data-block="run" class="rp-run"><b>รายงานสรุปผลกิจกรรม DLTV</b><span>${meta}</span></div>
       <div data-block><h2>ภาพรวม</h2><div class="k4">${kpiHtml(kpiList(st))}</div></div>
-      <div data-block>${chartBox('pHour', 230, 'จำนวนผู้เข้าร่วมตามช่วงเวลา', st.peak !== null ? `ช่วงที่คนมามากที่สุด ${hl(st.peak)}–${hl(st.peak + 1)} น. (${st.peakN} ครั้ง)` : '')}</div>
-      <div data-block class="two">${chartBox('pDay', 200, 'จำนวนผู้เข้าร่วมรายวัน')}${chartBox('pScore', 200, 'การกระจายคะแนน')}</div>
-      <div data-block class="two">${chartBox('pGroup', 200, 'กลุ่มผู้เข้าร่วม')}${chartBox('pQ', 200, 'อัตราตอบถูกรายข้อ')}</div>
-      <div data-block><h2>สรุปรายวัน</h2>${dailyHtml(st)}</div>
-      <div data-block><h2>ความหนาแน่น วันที่ × ช่วงเวลา (จำนวนครั้งที่เล่น)</h2>${heatHtml(st)}</div>
-      <div data-block><h2>ข้อที่ตอบผิดมากที่สุด</h2>${hardHtml(st)}</div>`;
-    if ($('#incWin').checked && st.winners.length) {
-      const per = 30; // แบ่งตารางเป็นช่วง ๆ ให้ขึ้นหน้าใหม่ได้สวย
-      for (let i = 0; i < st.winners.length; i += per) {
-        html += `<div data-block><h2>รายชื่อผู้ได้รับรางวัล${i ? ' (ต่อ)' : ` (${st.winners.length} คน)`}</h2>${winnersHtml(st.winners.slice(i, i + per), $('#mask').checked, i)}</div>`;
+      <div data-block>${box('pSlot', 734, 220, 'จำนวนผู้เล่นเกมตามช่วงเวลา', st.slotTot[st.peakI] ? `ช่วงที่คนเล่นมากที่สุด ${st.labels[st.peakI]} (${st.slotTot[st.peakI]} ครั้ง)` : '')}</div>
+      <div data-block><h2>การแจกตุ๊กตา DLTV ตามช่วงเวลา (โควตา 5 ตัว/ช่วง · 20 ตัว/วัน)</h2>${quotaHtml(st)}</div>
+      <div data-block class="two">${box('pDay', 346, 190, 'จำนวนผู้เข้าร่วมรายวัน')}${box('pScore', 346, 190, 'การกระจายคะแนน')}</div>
+      <div data-block class="two">${box('pGroup', 346, 190, 'กลุ่มผู้เข้าร่วม')}${box('pQ', 346, 190, 'อัตราตอบถูกรายข้อ')}</div>
+      <div data-block><h2>ข้อที่ตอบผิดมากที่สุด</h2>${hardHtml(st)}</div>
+      <div data-block><h2>ผลแบบสอบถามความพึงพอใจ${st.svAll.n ? ` (ผู้ตอบ ${st.svAll.n} คน: ผู้เล่น ${st.svAll.p} · ผู้เยี่ยมชม ${st.svAll.v})` : ''}</h2>${svTableHtml(st)}
+        <p class="muted" style="margin:6px 0 0">เกณฑ์: 4.51–5.00 มากที่สุด · 3.51–4.50 มาก · 2.51–3.50 ปานกลาง · 1.51–2.50 น้อย · 1.00–1.50 น้อยที่สุด</p></div>
+      <div data-block class="two">${box('pSv', 346, 200, 'ค่าเฉลี่ยความพึงพอใจรายข้อ')}${box('pSvDist', 346, 200, 'การกระจายระดับความพึงพอใจ')}</div>`;
+    for (let i = 0; i < Math.max(st.sug.length, 1); i += 24) {
+      html += `<div data-block><h2>ข้อเสนอแนะเพิ่มเติม${i ? ' (ต่อ)' : ` (${st.sug.length} รายการ)`}</h2><div class="sug">${sugHtml(st.sug.slice(i, i + 24))}</div></div>`;
+    }
+    html += `<div data-block><h2>สรุปรายวัน</h2>${dailyHtml(st)}</div>`;
+    const W = winnersList();
+    if ($('#incWin').checked && W.length) {
+      for (let i = 0; i < W.length; i += 30) {
+        html += `<div data-block><h2>รายชื่อผู้ขอรับรางวัล${i ? ' (ต่อ)' : ` (${W.length} คน)`}</h2>${winnersHtml(W.slice(i, i + 30), $('#mask').checked, i)}</div>`;
       }
     }
     root.innerHTML = html;
 
-    // กราฟในรายงาน: ขนาดคงที่ ไม่มีแอนิเมชัน ความละเอียด 2x
     const fixed = (cfg) => { cfg.options = { ...cfg.options, responsive: false, animation: false, devicePixelRatio: 2, maintainAspectRatio: false }; return cfg; };
-    [['pHour', cfgHour], ['pDay', cfgDay], ['pScore', cfgScore], ['pGroup', cfgGroup], ['pQ', cfgQ]].forEach(([id, fn]) => made.push(new Chart(document.getElementById(id), fixed(fn(st)))));
+    [['pSlot', cfgSlot], ['pDay', cfgDay], ['pScore', cfgScore], ['pGroup', cfgGroup], ['pQ', cfgQ], ['pSv', cfgSv], ['pSvDist', cfgSvDist]]
+      .forEach(([id, fn]) => made.push(new Chart(document.getElementById(id), fixed(fn(st)))));
 
     await Promise.all([...root.querySelectorAll('img')].map((im) => (im.complete ? 0 : new Promise((r) => { im.onload = im.onerror = r; }))));
     if (document.fonts) await document.fonts.ready;
     await sleep(150);
 
-    // จับภาพทีละส่วน
     const shot = (el) => html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 1200 });
-    const blocks = [...root.querySelectorAll('[data-block]')];
-    const imgs = [];
+    const blocks = [...root.querySelectorAll('[data-block]')], imgs = [];
     for (let i = 0; i < blocks.length; i++) {
       $('#busyText').textContent = `กำลังสร้าง PDF… ${Math.round(((i + 1) / blocks.length) * 100)}%`;
       imgs.push({ kind: blocks[i].dataset.block, canvas: await shot(blocks[i]) });
     }
 
-    // จัดหน้า A4
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-    const M = 12, W = 210 - M * 2, top = M, bottom = 297 - 14;
-    const mm = (cv) => (cv.height / cv.width) * W;
-    const put = (cv, y) => { pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', M, y, W, mm(cv)); return y + mm(cv); };
+    const M = 12, Wd = 210 - M * 2, top = M, bottom = 297 - 14;
+    const mm = (cv) => (cv.height / cv.width) * Wd;
+    const put = (cv, y) => { pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', M, y, Wd, mm(cv)); return y + mm(cv); };
     const run = imgs.find((x) => x.kind === 'run').canvas;
     let y = top;
     imgs.filter((x) => x.kind !== 'run').forEach((x, i) => {
-      const h = mm(x.canvas);
-      if (i > 0 && y + h > bottom) { pdf.addPage(); y = put(run, top) + 1; }
+      if (i > 0 && y + mm(x.canvas) > bottom) { pdf.addPage(); y = put(run, top) + 1; }
       y = put(x.canvas, y);
     });
     const pages = pdf.internal.getNumberOfPages();
     for (let p = 1; p <= pages; p++) {
       pdf.setPage(p); pdf.setDrawColor(229, 231, 235); pdf.line(M, 297 - 10, 210 - M, 297 - 10);
       pdf.setFontSize(8.5); pdf.setTextColor(120);
-      pdf.text('DLTV Quiz Report', M, 297 - 6);
+      pdf.text('DLTV Quiz & Satisfaction Report', M, 297 - 6);
       pdf.text(`${p} / ${pages}`, 210 - M, 297 - 6, { align: 'right' });
     }
-    pdf.save(`DLTV-Quiz-สรุปผล-${st.D || 'ทุกวัน'}.pdf`);
+    pdf.save(`DLTV-สรุปผล-${st.F.from === st.F.to ? st.F.from : st.F.from + '_' + st.F.to}.pdf`);
   } catch (e) {
     console.error(e); alert('สร้าง PDF ไม่สำเร็จ: ' + e.message);
   } finally {
@@ -317,24 +405,17 @@ async function exportPdf() {
 }
 
 // ===================================================== helpers
-function heat(f) {
-  if (!f) return '';
-  const c = mix([238, 241, 250], [43, 57, 144], Math.min(f, 1)); // ฟ้าอ่อน -> น้ำเงิน
-  return `background:rgb(${c});color:${f > 0.5 ? '#fff' : '#1f2937'}`;
-}
+function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
+function sd(a) { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); }
 function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
-function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(','); }
-function sum(a, i) { return a.reduce((s, r) => s + (Number(r[i]) || 0), 0); }
 function pct(x) { return (x * 100).toFixed(1) + '%'; }
 function fmt(n) { return Number(n).toLocaleString('th-TH'); }
-function hl(h) { return ('0' + h).slice(-2) + ':00'; }
-function fmtSec(s) { s = Math.round(s); return s >= 60 ? `${Math.floor(s / 60)} นาที ${s % 60} วิ` : s + ' วินาที'; }
 function thDate(d) { const p = String(d).split('-'); return p.length === 3 ? `${+p[2]} ${TH_MONTH[+p[1] - 1]} ${+p[0] + 543}` : d; }
-function thStamp(s) { // "04/11/2026 12:29" -> "4 พ.ย. 2569 12:29 น."
+function thStamp(s) {
   const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})/);
   return m ? `${+m[1]} ${TH_MONTH[+m[2] - 1]} ${+m[3] + (+m[3] < 2400 ? 543 : 0)} ${m[4]} น.` : s;
 }
-function phone(p, mask) { return mask ? p.replace(/^(\d{3})\d{3}(\d{4})$/, '$1-xxx-$2') : p.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3'); }
+function phone(p, mask) { return mask ? String(p).replace(/^(\d{3})\d{3}(\d{4})$/, '$1-xxx-$2') : String(p).replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3'); }
 function wrap(s) { return String(s).match(/.{1,48}/g) || [s]; }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

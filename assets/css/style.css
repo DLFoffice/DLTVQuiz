@@ -191,7 +191,7 @@ main{position:relative;padding-top:var(--space-top);transition:padding-top .8s v
 .badge.ok{background:#dcfce7;color:#0f8a50}.badge.bad{background:#eef0fa;color:var(--blue)}
 .ticket{position:relative;margin:14px auto 6px;max-width:360px;border-radius:18px;padding:16px;color:var(--navy);
   background:linear-gradient(120deg,#fff3c4,#ffd23f 40%,#ff9ec9 100%);box-shadow:0 14px 30px rgba(255,79,163,.35);
-  animation:flipIn 1s var(--spring) both 1.2s;transform-origin:50% 0}
+  animation:flipIn .9s var(--spring) both .45s;transform-origin:50% 0}
 .ticket::before,.ticket::after{content:"";position:absolute;top:50%;width:22px;height:22px;margin-top:-11px;border-radius:50%;background:#fff}
 .ticket::before{left:-11px}.ticket::after{right:-11px}
 .ticket small{display:block;font-size:13px;opacity:.8}
@@ -239,3 +239,59 @@ main{position:relative;padding-top:var(--space-top);transition:padding-top .8s v
 .modal-card h3{font-family:Kanit;font-weight:600;color:var(--blue);margin:6px 0 6px;font-size:21px}
 .modal-card p{color:var(--muted);line-height:1.6;margin:0}
 .modal-card .btn-ghost{color:var(--blue);background:#eef0fa;border:0}
+
+/* ---------- ช่วงเวลา / ปุ่มรอง ---------- */
+.slot-info{text-align:center;font-size:14px;margin:-4px 0 12px;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
+.slot-info b{color:var(--y);font-family:Kanit;font-size:16px}
+.slot-info.empty b{color:#ff9ec9}
+.btn-soft{width:100%;margin-top:12px;font-size:16px;padding:12px 16px;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28)}
+.btn-ghost-dark{flex:1;color:var(--blue);background:#eef0fa}
+
+/* ---------- ปุ่มขอรับรางวัล ---------- */
+.btn-claim{width:100%;margin-top:12px;font-size:20px;color:#fff;background:linear-gradient(135deg,#22c55e,#0ea5a4);box-shadow:0 6px 0 #0b7a6b,0 14px 28px rgba(14,165,164,.35);animation:pulse 1.8s ease-in-out infinite}
+.btn-claim img{height:40px;margin:-8px 0}
+.btn-claim b{font-size:26px;line-height:1}
+.btn-claim.gift{background:linear-gradient(135deg,#8b5cf6,#ff4fa3);box-shadow:0 6px 0 #8a2a68,0 14px 28px rgba(255,79,163,.3)}
+@keyframes pulse{50%{transform:scale(1.025)}}
+.fine.center{text-align:center}
+
+/* ---------- หน้ารับรางวัล / ขอบคุณ ---------- */
+.reward-ico{width:96px;height:96px;margin:0 auto 6px;border-radius:50%;display:grid;place-items:center;font-size:52px;
+  background:radial-gradient(circle at 35% 30%,#fff7d1,#ffd23f);box-shadow:0 10px 26px rgba(255,194,26,.45);animation:pop .6s var(--spring) both}
+.reward-ico img{height:84px;margin-top:6px}
+.reward-ico.gift{background:radial-gradient(circle at 35% 30%,#ffe3f1,#ff9ec9);box-shadow:0 10px 26px rgba(255,79,163,.35)}
+.ticket.gift{background:linear-gradient(120deg,#f3e8ff,#e9d5ff 40%,#ffc9e3 100%);box-shadow:0 14px 30px rgba(139,92,246,.3)}
+.step{margin:14px 0 4px;padding:12px 14px;border-radius:14px;background:#f1f5ff;color:var(--ink);font-size:15px;line-height:1.6;border:1px dashed #b9c4f0}
+.step b{display:inline-block;color:#fff;background:var(--blue2);border-radius:8px;padding:0 8px;margin-right:6px;font-family:Kanit;font-weight:500}
+
+/* ---------- แบบสอบถาม ---------- */
+.survey h2{margin-bottom:0}
+.sv-sub{margin:2px 0 8px;color:var(--muted)}
+.sv-help{font-size:14px;line-height:1.6;color:var(--ink);background:#f6f7fd;border-radius:12px;padding:8px 12px;margin:0 0 12px}
+.sv-help span{color:var(--muted);font-size:13px}
+.sv-label{display:block;font-weight:600;margin:12px 0 6px;color:var(--navy)}
+.sv-label small{font-weight:400;color:var(--muted)}
+#svGroupWrap.err .groups{animation:shake .4s}
+.sv-item{border:2px solid #e8ebf6;border-radius:16px;padding:10px 12px 12px;margin:0 0 10px;transition:border-color .2s,background .2s}
+.sv-item.done{border-color:#c9f0d8;background:#f7fffa}
+.sv-item.err{border-color:var(--bad);animation:shake .4s}
+.sv-item legend{display:flex;gap:8px;align-items:flex-start;font-weight:600;color:var(--navy);line-height:1.5;padding:0;margin-bottom:8px;font-size:15.5px}
+.sv-no{flex:0 0 26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#fff;background:var(--blue2);font-family:Kanit;font-size:14px}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.scale button{display:flex;flex-direction:column;align-items:center;gap:1px;border:2px solid #e3e6f5;background:#fff;border-radius:12px;padding:7px 2px;cursor:pointer;color:var(--ink);
+  transition:transform .2s var(--spring),background .2s,border-color .2s}
+.scale button b{font-family:Kanit;font-size:20px;line-height:1.1}
+.scale button small{font-size:11px;color:var(--muted);white-space:nowrap}
+.scale .lv5{--c:#16a34a}.scale .lv4{--c:#65a30d}.scale .lv3{--c:#d97706}.scale .lv2{--c:#ea580c}.scale .lv1{--c:#dc2626}
+.scale button b{color:var(--c)}
+.scale button[aria-checked="true"]{background:var(--c);border-color:var(--c);transform:scale(1.06)}
+.scale button[aria-checked="true"] b,.scale button[aria-checked="true"] small{color:#fff}
+#svSuggest{width:100%;font:inherit;font-size:16px;border:2px solid #dfe3f3;border-radius:14px;padding:10px 12px;background:#f7f8fd;resize:vertical;outline:none}
+#svSuggest:focus{border-color:var(--blue2);background:#fff}
+.sv-progress{text-align:center;color:var(--muted);font-size:14px;margin:10px 0 0}
+
+body[data-screen="claim"] {--stage-top:84px; --stage-h:150px; --space-top:156px}
+body[data-screen="survey"]{--stage-top:84px; --stage-h:120px; --stage-w:112px; --stage-l:calc(100% - 120px); --space-top:4px}
+body[data-screen="thanks"]{--stage-top:84px; --stage-h:200px; --space-top:206px}
+body[data-screen="survey"] .bubble{right:128px;top:96px;border-radius:16px 16px 4px 16px;transform-origin:100% 100%;max-width:55%}
+body[data-screen="survey"] .survey{margin-top:126px}

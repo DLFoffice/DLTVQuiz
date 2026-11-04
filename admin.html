@@ -39,32 +39,52 @@
         <div><b>ระบบหลังบ้าน DLTV Quiz</b><small id="upd">-</small></div>
       </div>
       <div class="bar-ctl">
-        <select id="fDate" aria-label="เลือกวันที่"></select>
         <button id="bRefresh" class="ghost">รีเฟรช</button>
         <button id="bPdf" class="primary">Export PDF</button>
         <button id="bLogout" class="ghost">ออกจากระบบ</button>
       </div>
     </header>
 
+    <!-- ตัวกรอง -->
+    <section class="filters">
+      <div class="f-quick" id="fQuick">
+        <button data-q="today">วันนี้</button><button data-q="yesterday">เมื่อวาน</button><button data-q="all" class="on">ทั้งหมด</button>
+      </div>
+      <label>ตั้งแต่ <select id="fFrom"></select></label>
+      <label>ถึง <select id="fTo"></select></label>
+      <label>ช่วงเวลา <select id="fSlot"></select></label>
+      <span class="f-sum" id="fSum"></span>
+    </section>
+
     <main>
       <section class="kpis" id="kpis"></section>
 
       <section class="grid">
         <div class="box span2">
-          <div class="box-head"><h3>จำนวนผู้เข้าร่วมตามช่วงเวลา</h3><p class="note" id="peak"></p></div>
-          <div class="cv tall"><canvas id="cHour"></canvas></div>
+          <div class="box-head"><h3>จำนวนผู้เล่นเกมตามช่วงเวลา</h3><p class="note" id="peak"></p></div>
+          <div class="cv tall"><canvas id="cSlot"></canvas></div>
         </div>
+        <div class="box span2"><h3>การแจกตุ๊กตา DLTV ตามช่วงเวลา <small class="muted">(โควตา 5 ตัว/ช่วง · 20 ตัว/วัน)</small></h3><div class="scroll" id="quota"></div></div>
         <div class="box"><h3>จำนวนผู้เข้าร่วมรายวัน</h3><div class="cv"><canvas id="cDay"></canvas></div></div>
         <div class="box"><h3>การกระจายคะแนน</h3><div class="cv"><canvas id="cScore"></canvas></div></div>
-        <div class="box"><h3>กลุ่มผู้เข้าร่วม</h3><div class="cv"><canvas id="cGroup"></canvas></div></div>
+        <div class="box"><h3>กลุ่มผู้เข้าร่วม (ผู้เล่น + ผู้เยี่ยมชม)</h3><div class="cv"><canvas id="cGroup"></canvas></div></div>
         <div class="box"><h3>อัตราตอบถูกรายข้อ</h3><div class="cv"><canvas id="cQ"></canvas></div></div>
         <div class="box span2"><h3>ข้อที่ตอบผิดมากที่สุด</h3><div id="hard"></div></div>
-        <div class="box span2"><h3>ความหนาแน่น วันที่ × ช่วงเวลา (จำนวนครั้งที่เล่น)</h3><div class="scroll" id="heat"></div></div>
+
+        <div class="box span2 sv-box">
+          <div class="box-head"><h3>ผลแบบสอบถามความพึงพอใจ</h3><p class="note" id="svNote"></p></div>
+          <div id="svTable" class="scroll"></div>
+        </div>
+        <div class="box"><h3>ค่าเฉลี่ยความพึงพอใจรายข้อ</h3><div class="cv"><canvas id="cSv"></canvas></div></div>
+        <div class="box"><h3>การกระจายระดับความพึงพอใจ</h3><div class="cv"><canvas id="cSvDist"></canvas></div></div>
+        <div class="box span2"><h3>ข้อเสนอแนะเพิ่มเติม <span class="count" id="sugCount"></span></h3><div id="sug" class="sug"></div></div>
+
         <div class="box span2"><h3>สรุปรายวัน</h3><div class="scroll" id="daily"></div></div>
         <div class="box span2">
           <div class="box-head">
-            <h3>รายชื่อผู้ได้รับรางวัล <span class="count" id="winCount"></span></h3>
+            <h3>รายชื่อผู้ขอรับรางวัล <span class="count" id="winCount"></span></h3>
             <div class="box-tools">
+              <select id="wType"><option value="">ทุกประเภท</option><option value="doll">ตุ๊กตา DLTV</option><option value="gift">รางวัลปลอบใจ</option></select>
               <input id="wSearch" type="search" placeholder="ค้นหาชื่อ / เบอร์ / รหัส">
               <label class="chk"><input type="checkbox" id="mask" checked> ซ่อนเบอร์โทร</label>
               <label class="chk"><input type="checkbox" id="incWin" checked> รวมรายชื่อใน PDF</label>

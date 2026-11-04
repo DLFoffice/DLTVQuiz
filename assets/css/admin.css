@@ -106,3 +106,37 @@ tr.tot td{background:#fdf7e6;font-weight:700}
 .rp .hard article{padding:8px}
 .rp .hard p{font-size:11.5px;margin:4px 0}
 .rp .hard .rate{font-size:17px}
+
+/* ---------- ตัวกรอง ---------- */
+.filters{max-width:1240px;margin:14px auto 0;padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.filters label{font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.filters select{border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;background:#fff;color:var(--ink);min-width:150px}
+.f-quick{display:flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;background:#fff}
+.f-quick button{border:0;background:none;padding:6px 14px;cursor:pointer;color:var(--ink)}
+.f-quick button+button{border-left:1px solid #e5e7eb}
+.f-quick button.on{background:var(--navy);color:#fff}
+.f-sum{margin-left:auto;font-size:14px;color:var(--navy);font-weight:600}
+.muted{color:var(--muted);font-weight:400;font-size:13px}
+main{padding-top:10px}
+
+/* ---------- โควตาตุ๊กตา ---------- */
+.q-cell{min-width:110px}
+.q-bar{height:6px;border-radius:6px;background:#eef0f5;overflow:hidden;margin-top:4px}
+.q-bar i{display:block;height:100%;background:var(--y)}
+.q-bar i.full{background:var(--green)}
+.q-num{font-weight:600}
+
+/* ---------- แบบสอบถาม ---------- */
+.sv-tbl td.l{white-space:normal;min-width:280px;line-height:1.45}
+.sv-tbl .mean{font-family:Kanit;font-weight:500;font-size:16px;color:var(--navy)}
+.lvl{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12.5px;font-weight:600}
+.lvl.l5{background:#e7f4ec;color:#256c47}.lvl.l4{background:#eef6e4;color:#4d6b1d}.lvl.l3{background:#fbf1de;color:#8a5a10}
+.lvl.l2{background:#fdece4;color:#9a3f17}.lvl.l1{background:#fbe7ea;color:#9b2c3e}
+.sv-tbl tr.tot td{background:#eef0f8}
+.sug{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:420px;overflow:auto}
+.sug article{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;line-height:1.5}
+.sug article small{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+.rp .sug{max-height:none;overflow:visible}
+.rp .sug article{font-size:11.5px;padding:6px 9px}
+.rp .sv-tbl td.l{min-width:0}
+@media(max-width:760px){.sug{grid-template-columns:1fr}.f-sum{margin-left:0}}

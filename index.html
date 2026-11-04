@@ -46,10 +46,12 @@
         <h1 class="title" data-in>ตอบคำถาม<br><span>ชิงตุ๊กตา DLTV</span></h1>
         <div class="chips" data-in>
           <div class="chip"><b id="hQ">10</b><small>คำถาม</small></div>
-          <div class="chip"><b>≥ <span id="hPass">8</span></b><small>ข้อถูก รับเลย</small></div>
-          <div class="chip chip-doll"><img src="assets/img/mascot.png" alt="" class="chip-ico"><small>ตุ๊กตา DLTV</small></div>
+          <div class="chip chip-doll"><img src="assets/img/mascot.png" alt="" class="chip-ico"><small>ถูกครบ 10 ข้อ<br>รับตุ๊กตา DLTV</small></div>
+          <div class="chip"><b>🎁</b><small>ร่วมสนุก<br>รับรางวัลปลอบใจ</small></div>
         </div>
+        <p class="slot-info" id="slotInfo" data-in hidden></p>
         <button class="btn btn-go" id="bStart" data-in disabled><span>กำลังโหลด…</span></button>
+        <button class="btn btn-soft" id="bVisitor" data-in><span>ผู้เยี่ยมชมบูธ · ทำแบบสอบถามความพึงพอใจ</span></button>
         <p class="hint" data-in>แตะที่น้อง DLTV หรือปัดซ้าย-ขวาเพื่อหมุนตัว</p>
       </section>
 
@@ -101,6 +103,38 @@
       <!-- 5) ผลลัพธ์ -->
       <section id="sResult" class="screen">
         <div class="card result" id="result"></div>
+      </section>
+
+      <!-- 6) ได้รับรางวัลแล้ว → ไปทำแบบสอบถาม -->
+      <section id="sClaim" class="screen">
+        <div class="card result" id="claim"></div>
+      </section>
+
+      <!-- 7) แบบสอบถามความพึงพอใจ -->
+      <section id="sSurvey" class="screen">
+        <form id="fSurvey" class="card survey" novalidate>
+          <h2 data-in>แบบสอบถามความพึงพอใจ</h2>
+          <p class="sv-sub" data-in>ต่อการจัดแสดงนิทรรศการของมูลนิธิฯ</p>
+          <p class="sv-help" data-in>โปรดเลือกระดับความพึงพอใจที่ตรงกับความคิดเห็นของท่านมากที่สุด<br>
+            <span>5 = มากที่สุด · 4 = มาก · 3 = ปานกลาง · 2 = น้อย · 1 = น้อยที่สุด</span></p>
+          <div id="svGroupWrap" data-in hidden>
+            <p class="sv-label">ท่านเป็น</p>
+            <div class="groups" id="svGroups" role="radiogroup" aria-label="กลุ่มผู้เข้าร่วม"></div>
+          </div>
+          <div id="svItems"></div>
+          <label class="sv-label" for="svSuggest">ข้อเสนอแนะเพิ่มเติม <small>(ไม่บังคับ)</small></label>
+          <textarea id="svSuggest" rows="3" maxlength="1000" placeholder="พิมพ์ข้อเสนอแนะของท่าน…"></textarea>
+          <p class="sv-progress" id="svProgress"></p>
+          <div class="row">
+            <button type="button" class="btn btn-ghost" id="svBack">ย้อนกลับ</button>
+            <button type="submit" class="btn btn-go" id="svSend"><span>ส่งแบบสอบถาม</span></button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 8) ขอบคุณ -->
+      <section id="sThanks" class="screen">
+        <div class="card result" id="thanks"></div>
       </section>
     </main>
 
