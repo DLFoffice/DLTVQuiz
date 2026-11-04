@@ -1,5 +1,5 @@
 // ระบบหลังบ้าน: ดึงสถิติจาก GAS → แดชบอร์ด (กรองช่วงวันที่/ช่วงเวลา) + รายงาน PDF (A4)
-import { getStats } from './api.js';
+import { getStats, setReceived } from './api.js';
 
 const $ = (s) => document.querySelector(s);
 const LETTERS = ['ก', 'ข', 'ค', 'ง'];
@@ -280,11 +280,13 @@ function dailyHtml(st) {
     R.map((x) => `<tr><td class="l">${thDate(x.d)}</td><td>${x.n}</td><td>${x.people}</td><td>${x.perfect}</td><td>${x.dolls}</td><td>${x.gifts}</td><td>${x.rec}</td><td>${x.sv}</td><td>${x.sat === null ? '-' : x.sat.toFixed(2)}</td></tr>`).join('') +
     (R.length > 1 ? `<tr class="tot"><td class="l">รวม</td><td>${sum('n')}</td><td>${st.people}</td><td>${sum('perfect')}</td><td>${sum('dolls')}</td><td>${sum('gifts')}</td><td>${sum('rec')}</td><td>${sum('sv')}</td><td>${sat}</td></tr>` : '') + '</table>';
 }
-function winnersHtml(W, mask, start = 0) {
+function winnersHtml(W, mask, start = 0, live = false) {
   return `<table><tr><th>#</th><th class="l">วันที่ / เวลา</th><th class="l">ช่วงเวลา</th><th class="l">ชื่อ-สกุล</th><th>เบอร์โทร</th><th class="l">กลุ่ม</th><th>คะแนน</th><th class="l">รางวัล</th><th>รหัสรางวัล</th><th>สถานะ</th></tr>` +
     W.map((w, i) => `<tr><td>${start + i + 1}</td><td class="l">${thDate(w[0])} ${esc(w[9])}</td><td class="l">${esc(slotLabels()[slotKey(w[1])])}</td><td class="l">${esc(w[6])}</td>
       <td>${phone(w[7], mask)}</td><td class="l">${esc(w[3])}</td><td>${w[4]}</td><td class="l">${w[2] === 'doll' ? 'ตุ๊กตา DLTV' : 'รางวัลปลอบใจ'}</td><td><b>${esc(w[8])}</b></td>
-      <td>${w[5] ? '<span class="pill ok">รับแล้ว</span>' : '<span class="pill wait">รอรับ</span>'}</td></tr>`).join('') + '</table>';
+      <td>${live
+        ? (w[5] ? `<button class="rcv done" data-code="${esc(w[8])}" title="กดเพื่อยกเลิก">✓ รับแล้ว</button>` : `<button class="rcv" data-code="${esc(w[8])}">ยืนยันรับของ</button>`)
+        : (w[5] ? '<span class="pill ok">รับแล้ว</span>' : '<span class="pill wait">รอรับ</span>')}</td></tr>`).join('') + '</table>';
 }
 
 // ===================================================== แสดงผลบนหน้าจอ
@@ -313,8 +315,22 @@ function renderWinners() {
   if (!S) return;
   const W = winnersList();
   $('#winCount').textContent = W.length + ' คน';
-  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked) : '<p class="empty">ยังไม่มีผู้ขอรับรางวัล</p>';
+  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked, 0, true) : '<p class="empty">ยังไม่มีผู้ขอรับรางวัล</p>';
 }
+
+// เจ้าหน้าที่กดยืนยันการรับของ → ติ๊ก "รับของแล้ว" ในชีตให้อัตโนมัติ
+$('#winners').addEventListener('click', async (e) => {
+  const b = e.target.closest('button.rcv'); if (!b || b.disabled) return;
+  const code = b.dataset.code, row = S.claims.find((r) => r[8] === code); if (!row) return;
+  const to = !row[5];
+  if (!to && !confirm(`ยกเลิกสถานะ "รับแล้ว" ของ ${code} ?`)) return;
+  b.disabled = true; b.textContent = 'กำลังบันทึก…';
+  try {
+    await setReceived(KEY, code, to);
+    row[5] = to ? 1 : 0;
+    render();
+  } catch (err) { alert('บันทึกไม่สำเร็จ: ' + err.message); renderWinners(); }
+});
 function draw(id, cfg) {
   if (!window.Chart) return;
   if (charts[id]) charts[id].destroy();

@@ -240,15 +240,15 @@ function showResult(r) {
   } else if (r.perfect && rw.expect === 'doll') {
     html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
       <p class="muted">ช่วงเวลา ${esc(rw.slotLabel)} เหลือตุ๊กตา ${rw.dollsLeft} ตัว</p>
-      <button class="btn btn-claim" id="bClaim"><img src="assets/img/mascot.png" alt=""><span>ขอรับตุ๊กตา DLTV</span></button>`;
+      <button class="btn btn-claim" id="bClaim"><img src="assets/img/mascot.png" alt=""><span>กดรับตุ๊กตา DLTV</span></button>`;
   } else if (r.perfect) {
     html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
       <p class="muted">${esc(rw.why)} รับรางวัลปลอบใจแทนได้เลยครับ</p>
-      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>ขอรับรางวัลปลอบใจ</span></button>`;
+      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>กดรับรางวัลปลอบใจ</span></button>`;
   } else {
     html += `<span class="badge bad">ต้องถูกครบ ${r.passScore} ข้อจึงรับตุ๊กตาได้</span>
       <p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>
-      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>ขอรับรางวัลปลอบใจ</span></button>
+      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>กดรับรางวัลปลอบใจ</span></button>
       <p class="fine center">หรือกด "เล่นอีกครั้ง" เพื่อลุ้นตุ๊กตา · รับรางวัลได้ 1 ครั้งต่อคน</p>`;
   }
   if (r.demo) html += `<p class="muted">(โหมดทดลอง — ผลนี้เป็นตัวอย่าง)</p>`;

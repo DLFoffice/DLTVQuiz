@@ -181,6 +181,12 @@ export async function submitSurvey(payload) {
   return call('POST', {}, { action: 'survey', ...payload });
 }
 
+/** เจ้าหน้าที่ยืนยัน/ยกเลิกการรับของ (หน้า admin) */
+export async function setReceived(key, code, received) {
+  if (DEMO) throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน assets/js/config.js');
+  return call('POST', {}, { action: 'receive', key, code, received });
+}
+
 export async function getStats(key) {
   if (DEMO) throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน assets/js/config.js');
   return call('GET', { action: 'stats', key });
