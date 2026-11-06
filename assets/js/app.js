@@ -159,6 +159,9 @@ $('#fReg').addEventListener('submit', async (e) => {
 
 function startQuiz() {
   S.idx = 0; S.answers = {}; S.startedAt = Date.now();
+  // สุ่มลำดับข้อ + ตำแหน่งตัวเลือกใหม่ทุกครั้งที่เริ่มเล่น (แต่ละเครื่องไม่เหมือนกัน)
+  // ส่งคำตอบเป็น "เลขตัวเลือกเดิม" ผูกกับรหัสข้อ → GAS ตรวจคะแนนได้ถูกต้องเหมือนเดิม
+  S.qs = shuffle(S.quiz.questions).map((q) => ({ ...q, opts: shuffleChoices(q.choices) }));
   // รหัสการส่งครั้งนี้: ถ้าระบบต้องส่งซ้ำ (เน็ตหลุด) เซิร์ฟเวอร์จะไม่บันทึกซ้ำ
   S.submitId = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   renderQ(false);
@@ -177,14 +180,14 @@ $('#mGo').addEventListener('click', () => { hideModal(); startQuiz(); });
 
 // ===================================================== คำถาม
 function renderQ(animate = true, back = false) {
-  const q = S.quiz.questions[S.idx], n = S.quiz.questions.length;
+  const q = S.qs[S.idx], n = S.qs.length;
   const card = $('#qCard');
   const paint = () => {
     const no = $('#qNo'); no.textContent = S.idx + 1; no.classList.remove('pop'); void no.offsetWidth; no.classList.add('pop');
     $('#track').style.width = ((S.idx + 1) / n) * 100 + '%';
     $('#qText').innerHTML = q.question; // ข้อความจากผู้ดูแลระบบ (มีแท็ก <u>)
-    $('#qChoices').innerHTML = q.choices.map((c, i) =>
-      `<button type="button" class="choice c${i + 1}${S.answers[q.id] === i + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${i + 1}"><span class="k">${LETTERS[i]}</span><span>${esc(c)}</span></button>`).join('');
+    $('#qChoices').innerHTML = q.opts.map((o, i) =>
+      `<button type="button" class="choice c${i + 1}${S.answers[q.id] === o + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${o + 1}"><span class="k">${LETTERS[i]}</span><span>${esc(q.choices[o])}</span></button>`).join('');
     $('#bPrev').style.visibility = S.idx ? 'visible' : 'hidden';
     $('#bNext span').textContent = S.idx === n - 1 ? 'ส่งคำตอบ ✔' : 'ถัดไป';
   };
@@ -202,7 +205,7 @@ $('#qChoices').addEventListener('click', (e) => {
   const r = document.createElement('span'); const rect = b.getBoundingClientRect(); const d = Math.max(rect.width, rect.height);
   r.className = 'ripple'; r.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - rect.left - d / 2}px;top:${e.clientY - rect.top - d / 2}px`;
   b.appendChild(r); setTimeout(() => r.remove(), 600);
-  S.answers[S.quiz.questions[S.idx].id] = Number(b.dataset.v);
+  S.answers[S.qs[S.idx].id] = Number(b.dataset.v);
   [...e.currentTarget.children].forEach((x) => x.classList.toggle('sel', x === b));
   mascot('play', 'nod');
   if (navigator.vibrate) navigator.vibrate(12);
@@ -210,13 +213,13 @@ $('#qChoices').addEventListener('click', (e) => {
 
 $('#bPrev').addEventListener('click', () => { if (S.idx > 0) { S.idx--; renderQ(true, true); } });
 $('#bNext').addEventListener('click', () => {
-  const q = S.quiz.questions[S.idx];
+  const q = S.qs[S.idx];
   if (!S.answers[q.id]) {
     const c = $('#qCard'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
     toast('คุณยังไม่ได้เลือกคำตอบ'); mascot('play', 'shake'); say('เลือกคำตอบก่อนนะครับ 🙏', 1600);
     return;
   }
-  if (S.idx < S.quiz.questions.length - 1) {
+  if (S.idx < S.qs.length - 1) {
     S.idx++; renderQ(true);
     const cheers = ['เยี่ยมไปเลย!', 'ไปต่อกัน!', 'เก่งมากครับ 👍', 'อีกนิดเดียว!', 'ใกล้แล้ว ๆ'];
     if (S.idx % 3 === 0) say(cheers[(S.idx / 3) % cheers.length | 0], 1500);
@@ -263,7 +266,7 @@ function showResult(r) {
     const doll = rw.type === 'doll';
     html += `<span class="badge ok">${doll ? '🎉 คะแนนเต็ม! คุณได้รับตุ๊กตา DLTV' : r.perfect ? '🎉 คะแนนเต็ม!' : '🎁 คุณได้รับรางวัลปลอบใจ'}</span>
       ${rw.note ? `<p class="muted">${esc(rw.note)} จึงได้รับรางวัลปลอบใจแทน</p>` : ''}
-      ${!r.perfect ? `<p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>` : ''}
+      ${!r.perfect && r.wrong && r.wrong.length ? `<p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>` : ''}
       ${ticket(S.claim)}
       <div class="step"><b>ขั้นตอนสุดท้าย</b> ตอบแบบสอบถามความพึงพอใจ 7 ข้อ (ประมาณ 1 นาที)<br>แล้วแสดงหน้าจอสุดท้ายแก่เจ้าหน้าที่เพื่อรับ${esc(rw.reward)}</div>
       <button class="btn btn-claim ${doll ? '' : 'gift'}" id="bToSurvey">${doll ? '<img src="assets/img/mascot.png" alt="">' : '<b>📝</b>'}<span>ทำแบบสอบถาม ▶</span></button>`;
@@ -475,6 +478,21 @@ function cfTick() {
   };
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) requestAnimationFrame(loop); else loop(0);
 })();
+
+/** สุ่มตำแหน่งตัวเลือก (คืน index เดิม) — ตัวเลือก "ถูกทุกข้อ / ผิดทุกข้อ" อยู่ท้ายสุดเสมอ */
+function shuffleChoices(choices) {
+  const idx = choices.map((_, i) => i);
+  const pinned = idx.filter((i) => /(ถูก|ผิด)ทุกข้อ|ไม่มีข้อใดถูก/.test(choices[i]));
+  return shuffle(idx.filter((i) => !pinned.includes(i))).concat(pinned);
+}
+
+// สุ่มลำดับแบบ Fisher–Yates (ใช้ crypto ถ้ามี)
+function shuffle(arr) {
+  const a = arr.slice();
+  const rnd = (n) => { if (window.crypto && crypto.getRandomValues) { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] % n; } return Math.floor(Math.random() * n); };
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
