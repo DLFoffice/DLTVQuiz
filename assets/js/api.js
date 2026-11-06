@@ -139,9 +139,7 @@ async function call(method, params, body, tries = 4) {
 
 /** ช่วงเวลาปัจจุบัน + ตุ๊กตาคงเหลือ (เรียกตอนเปิดหน้าเว็บ — ช่วยปลุกเซิร์ฟเวอร์ GAS ด้วย) */
 export async function getStatus() {
-  if (DEMO) return { slot: 2, slotLabel: '15.00–16.59 น.', dollsLeft: 3, dollsPerSlot: 5, todayLeft: 8, todayTotal: 20, todayGiven: 9,
-    slots: [{ label: '11.00–12.59 น.', total: 5, given: 5, left: 0, state: 'past' }, { label: '13.00–14.59 น.', total: 5, given: 2, left: 0, state: 'past' },
-            { label: '15.00–16.59 น.', total: 5, given: 2, left: 3, state: 'now' }, { label: '17.00–21.00 น.', total: 5, given: 0, left: 5, state: 'upcoming' }] };
+  if (DEMO) return { todayLeft: 13, todayTotal: 20, todayGiven: 7, slotLabel: '15.00–16.59 น.' };
   return call('GET', { action: 'status' }, null, 2);
 }
 
@@ -161,7 +159,7 @@ export async function submitQuiz(payload) {
     // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบถูกทุกข้อ
     const review = QUIZ.questions.map((q) => ({ id: q.id, your: payload.answers[q.id] || null, correct: payload.answers[q.id] || null }));
     return { score: 10, total: 10, perfect: true, passScore: 10, wrong: [], review, demo: true,
-      reward: { already: '', expect: 'doll', dollsLeft: 3, slotLabel: '15.00–16.59 น.', why: '' } };
+      reward: { already: '', expect: 'doll', dollsLeft: 13, slotLabel: '15.00–16.59 น.', why: '' } };
   }
   return call('POST', {}, { action: 'submit', ...payload });
 }
@@ -171,7 +169,7 @@ export async function claimReward(submitId, demoType = 'doll') {
   if (DEMO) {
     await wait(700);
     return demoType === 'doll'
-      ? { claimed: true, type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-S3-01', note: '', slotLabel: '15.00–16.59 น.' }
+      ? { claimed: true, type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-08', note: '', slotLabel: '15.00–16.59 น.' }
       : { claimed: true, type: 'gift', reward: 'รางวัลปลอบใจ', code: 'GIFT-DEMO-001', note: '', slotLabel: '15.00–16.59 น.' };
   }
   return call('POST', {}, { action: 'claim', submitId });

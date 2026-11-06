@@ -79,24 +79,18 @@ async function refreshStatus() {
   try { renderStatus(await getStatus()); } catch (e) { /* ไม่แสดงถ้าโหลดไม่ได้ */ }
 }
 function renderStatus(st) {
-  if (!st.slots) return;
+  if (st.todayTotal === undefined) return;
   const box = $('#dolls');
   countTo($('#dLeft'), st.todayLeft);
   $('#dTotal').textContent = st.todayTotal;
   $('#dBar').style.width = (st.todayTotal ? (st.todayLeft / st.todayTotal) * 100 : 0) + '%';
   box.classList.toggle('out', st.todayLeft === 0);
-  $('#dSlots').innerHTML = st.slots.map((x) => {
-    const tag = x.state === 'now' ? 'ตอนนี้' : x.state === 'past' ? 'ผ่านไปแล้ว' : 'รอบถัดไป';
-    const val = x.state === 'past' ? `แจกแล้ว ${x.given}` : `เหลือ <b>${x.left}</b>/${x.total}`;
-    return `<div class="ds ${x.state}${x.state !== 'past' && !x.left ? ' empty' : ''}"><span class="ds-time">${esc(x.label.replace(' น.', ''))}</span><span class="ds-val">${val}</span><small>${tag}</small></div>`;
-  }).join('');
-  const now = st.slots.find((x) => x.state === 'now'), next = st.slots.find((x) => x.state === 'upcoming');
-  $('#dNote').textContent = now
-    ? (now.left ? `ช่วงนี้แจกอีก ${now.left} ตัว · ตอบถูกครบ 10 ข้อ รับเลย!` : `ช่วงนี้ตุ๊กตาหมดแล้ว${next ? ' · รอบถัดไป ' + next.label : ''} · ร่วมสนุกรับรางวัลปลอบใจได้`)
-    : next ? `เริ่มแจกตุ๊กตาช่วง ${next.label} · ตอนนี้ร่วมสนุกรับรางวัลปลอบใจได้` : 'วันนี้หมดช่วงเวลาแจกตุ๊กตาแล้ว · ขอบคุณที่ร่วมสนุกครับ';
+  $('#dNote').textContent = st.todayLeft
+    ? `แจกไปแล้ว ${st.todayGiven} ตัว · ตอบถูกครบ 10 ข้อ รับเลย! (แจกจนกว่าจะหมด)`
+    : 'ตุ๊กตาของวันนี้หมดแล้ว · ร่วมสนุกรับรางวัลปลอบใจได้ครับ';
   box.hidden = false;
   const r = $('#regDolls');
-  r.innerHTML = `🧸 วันนี้เหลือตุ๊กตา <b>${st.todayLeft}</b> ตัว` + (now ? ` · ช่วงนี้ <b>${now.left}</b> ตัว` : '');
+  r.innerHTML = st.todayLeft ? `🧸 วันนี้เหลือตุ๊กตา <b>${st.todayLeft}</b> ตัว` : '🧸 ตุ๊กตาของวันนี้หมดแล้ว · ยังร่วมสนุกรับรางวัลปลอบใจได้';
   r.hidden = false;
 }
 function countTo(el, to) {
@@ -264,7 +258,7 @@ function showResult(r) {
       <p class="muted">${esc(rw.already)} (รับรางวัลได้ 1 ครั้งต่อคน)</p>`;
   } else if (r.perfect && rw.expect === 'doll') {
     html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
-      <p class="muted">ช่วงเวลา ${esc(rw.slotLabel)} เหลือตุ๊กตา ${rw.dollsLeft} ตัว</p>
+      <p class="muted">วันนี้เหลือตุ๊กตา ${rw.dollsLeft} ตัว</p>
       <button class="btn btn-claim" id="bClaim"><img src="assets/img/mascot.png" alt=""><span>กดรับตุ๊กตา DLTV</span></button>`;
   } else if (r.perfect) {
     html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
@@ -413,7 +407,7 @@ function showThanks() {
        <h2>ขอบคุณที่ร่วมกิจกรรมครับ</h2>
        <p class="muted">กรุณา<b>แสดงหน้าจอนี้แก่เจ้าหน้าที่</b>เพื่อรับ${esc(c.reward)}</p>
        ${ticket(c)}
-       <p class="fine center">${esc(S.player.name)} · ${esc(c.slotLabel || '')}</p>`
+       <p class="fine center">${esc(S.player.name)}</p>`
     : `<div class="reward-ico">💙</div><h2>ขอบคุณสำหรับความคิดเห็นครับ</h2>
        <p class="muted">ความคิดเห็นของท่านจะนำไปพัฒนาการจัดนิทรรศการของมูลนิธิฯ ต่อไป</p>`;
   $('#thanks').innerHTML += `<div class="row"><button class="btn btn-go" id="bHome"><span>กลับหน้าแรก</span></button></div>`;

@@ -109,7 +109,8 @@ function compute() {
   const bySlot = (arr, d) => labels.map((_, i) => arr.filter((r) => (!d || r[0] === d) && slotKey(r[1]) === i).length);
   const slotTot = bySlot(P);
   const peakI = shownSlots.reduce((a, i) => (slotTot[i] > (slotTot[a] || 0) ? i : a), shownSlots[0]);
-  const quota = F.dates.map((d) => ({ d, given: S.slots.map((_, i) => S.claims.filter((r) => r[0] === d && r[1] === i && r[2] === 'doll').length) }));
+  // ตุ๊กตาที่แจกต่อวัน แยกตามช่วงเวลาที่แจก (เพื่อดูว่าหมดช่วงไหน) — นับทั้งวันไม่ขึ้นกับตัวกรองช่วงเวลา
+  const quota = F.dates.map((d) => ({ d, given: labels.map((_, i) => S.claims.filter((r) => r[0] === d && slotKey(r[1]) === i && r[2] === 'doll').length) }));
 
   const groups = {};
   P.forEach((r) => (groups[r[2]] = (groups[r[2]] || 0) + 1));
@@ -145,12 +146,12 @@ function rangeText(st) {
 }
 
 function kpiList(st) {
-  const quotaMax = st.F.dates.length * S.slots.reduce((a, s) => a + s.dolls, 0) / (st.F.sl === '' ? 1 : S.slots.length);
+  const quotaMax = st.F.dates.length * (S.dailyDolls || 20);
   const lv = level(st.svAll.mean);
   return [
     [C.navy, 'ผู้เล่นเกม', fmt(st.P.length) + ' ครั้ง', fmt(st.people) + ' คน (ไม่ซ้ำเบอร์)'],
     [C.green, 'ได้คะแนนเต็ม 10', fmt(st.perfect), st.P.length ? pct(st.perfect / st.P.length) + ' ของผู้เล่น' : '-'],
-    [C.amber, 'แจกตุ๊กตา DLTV', `${fmt(st.dolls)} / ${fmt(Math.round(quotaMax))}`, 'ตามโควตาของช่วงที่เลือก'],
+    [C.amber, 'แจกตุ๊กตา DLTV', st.F.sl === '' ? `${fmt(st.dolls)} / ${fmt(quotaMax)}` : fmt(st.dolls), st.F.sl === '' ? `วันละ ${S.dailyDolls || 20} ตัว × ${st.F.dates.length} วัน` : 'เฉพาะช่วงเวลาที่เลือก'],
     [C.rose, 'รางวัลปลอบใจ', fmt(st.gifts), 'ชิ้น'],
     [C.teal, 'รับของแล้ว', `${fmt(st.received)} / ${fmt(st.CL.length)}`, 'รอรับ ' + Math.max(st.CL.length - st.received, 0)],
     [C.violet, 'ตอบแบบสอบถาม', fmt(st.svAll.n) + ' คน', `ผู้เล่น ${st.svAll.p} · ผู้เยี่ยมชม ${st.svAll.v}`],
@@ -241,14 +242,12 @@ function cfgSvDist(st) {
 // ===================================================== ตาราง (ใช้ร่วมกัน)
 function quotaHtml(st) {
   if (!st.quota.length) return '<p class="empty">ยังไม่มีข้อมูล</p>';
-  const idx = st.F.sl === '' ? S.slots.map((_, i) => i) : (+st.F.sl < S.slots.length ? [+st.F.sl] : []);
-  if (!idx.length) return '<p class="empty">นอกช่วงเวลากิจกรรมไม่มีการแจกตุ๊กตา</p>';
-  return '<table><tr><th class="l">วันที่</th>' + idx.map((i) => `<th>${S.slots[i].label}</th>`).join('') + '<th>รวม</th></tr>' +
+  const max = S.dailyDolls || 20, labels = st.labels, idx = labels.map((_, i) => i).filter((i) => i < OUT() || st.quota.some((q) => q.given[i]));
+  return '<table><tr><th class="l">วันที่</th>' + idx.map((i) => `<th>${labels[i]}</th>`).join('') + `<th>รวม (วันละ ${max} ตัว)</th></tr>` +
     st.quota.map((q) => {
-      let tot = 0, max = 0;
-      const cells = idx.map((i) => { const g = q.given[i], m = S.slots[i].dolls; tot += g; max += m;
-        return `<td class="q-cell"><span class="q-num">${g}</span> / ${m}<div class="q-bar"><i class="${g >= m ? 'full' : ''}" style="width:${Math.min(100, (g / m) * 100)}%"></i></div></td>`; }).join('');
-      return `<tr><td class="l">${thDate(q.d)}</td>${cells}<td><b>${tot}</b> / ${max}</td></tr>`;
+      const tot = q.given.reduce((a, x) => a + x, 0);
+      return `<tr><td class="l">${thDate(q.d)}</td>${idx.map((i) => `<td>${q.given[i] || '-'}</td>`).join('')}
+        <td class="q-cell"><span class="q-num">${tot}</span> / ${max}<div class="q-bar"><i class="${tot >= max ? 'full' : ''}" style="width:${Math.min(100, (tot / max) * 100)}%"></i></div></td></tr>`;
     }).join('') + '</table>';
 }
 function hardHtml(st) {
@@ -359,7 +358,7 @@ async function exportPdf() {
       <div data-block="run" class="rp-run"><b>รายงานสรุปผลกิจกรรม DLTV</b><span>${meta}</span></div>
       <div data-block><h2>ภาพรวม</h2><div class="k4">${kpiHtml(kpiList(st))}</div></div>
       <div data-block>${box('pSlot', 734, 220, 'จำนวนผู้เล่นเกมตามช่วงเวลา', st.slotTot[st.peakI] ? `ช่วงที่คนเล่นมากที่สุด ${st.labels[st.peakI]} (${st.slotTot[st.peakI]} ครั้ง)` : '')}</div>
-      <div data-block><h2>การแจกตุ๊กตา DLTV ตามช่วงเวลา (โควตา 5 ตัว/ช่วง · 20 ตัว/วัน)</h2>${quotaHtml(st)}</div>
+      <div data-block><h2>การแจกตุ๊กตา DLTV รายวัน (วันละ ${S.dailyDolls || 20} ตัว · แยกตามช่วงเวลาที่แจก)</h2>${quotaHtml(st)}</div>
       <div data-block class="two">${box('pDay', 346, 190, 'จำนวนผู้เข้าร่วมรายวัน')}${box('pScore', 346, 190, 'การกระจายคะแนน')}</div>
       <div data-block class="two">${box('pGroup', 346, 190, 'กลุ่มผู้เข้าร่วม')}${box('pQ', 346, 190, 'อัตราตอบถูกรายข้อ')}</div>
       <div data-block><h2>ข้อที่ตอบผิดมากที่สุด</h2>${hardHtml(st)}</div>
