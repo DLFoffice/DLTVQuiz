@@ -266,16 +266,14 @@ function showResult(r) {
     const doll = rw.type === 'doll';
     html += `<span class="badge ok">${doll ? '🎉 คะแนนเต็ม! คุณได้รับตุ๊กตา DLTV' : r.perfect ? '🎉 คะแนนเต็ม!' : '🎁 คุณได้รับรางวัลปลอบใจ'}</span>
       ${rw.note ? `<p class="muted">${esc(rw.note)} จึงได้รับรางวัลปลอบใจแทน</p>` : ''}
-      ${!r.perfect && r.wrong && r.wrong.length ? `<p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>` : ''}
       ${ticket(S.claim)}
       <div class="step"><b>ขั้นตอนสุดท้าย</b> ตอบแบบสอบถามความพึงพอใจ 7 ข้อ (ประมาณ 1 นาที)<br>แล้วแสดงหน้าจอสุดท้ายแก่เจ้าหน้าที่เพื่อรับ${esc(rw.reward)}</div>
       <button class="btn btn-claim ${doll ? '' : 'gift'}" id="bToSurvey">${doll ? '<img src="assets/img/mascot.png" alt="">' : '<b>📝</b>'}<span>ทำแบบสอบถาม ▶</span></button>`;
   }
   if (r.demo) html += `<p class="muted">(โหมดทดลอง — ผลนี้เป็นตัวอย่าง)</p>`;
-  if (r.review) html += `<button class="btn btn-review" id="bReview" aria-expanded="false"><span>📋 ดูเฉลยคำตอบ</span></button><div class="review" id="review" hidden></div>`;
+  // ไม่แสดงเฉลย/ข้อที่ผิด (กันการจำคำตอบแล้วมาเล่นใหม่) — ไม่ว่าเซิร์ฟเวอร์จะส่งมาหรือไม่
   html += `<div class="row"><button class="btn btn-ghost-dark" id="bAgain"><span>กลับหน้าแรก</span></button></div>`;
   $('#result').innerHTML = html;
-  if (r.review) $('#bReview').onclick = () => toggleReview(r);
   if ($('#bToSurvey')) $('#bToSurvey').onclick = () => openSurvey('player');
   $('#bAgain').onclick = () => (S.claim && !confirm('ยังไม่ได้ทำแบบสอบถาม ต้องการกลับหน้าแรกหรือไม่?') ? null : resetHome());
   go('result');
@@ -390,31 +388,6 @@ function showThanks() {
   go('thanks');
   mascot('setMood', 'happy'); mascot('play', 'happy'); mascot('burst', 40);
   setTimeout(() => say('ขอบคุณมากครับ 💛', 3000), 700);
-}
-
-// ===================================================== เฉลย
-function toggleReview(r) {
-  const box = $('#review'), btn = $('#bReview');
-  const open = box.hidden;
-  btn.setAttribute('aria-expanded', String(open));
-  btn.querySelector('span').textContent = open ? '🔼 ซ่อนเฉลย' : '📋 ดูเฉลยคำตอบ';
-  if (!open) { box.classList.remove('open'); setTimeout(() => (box.hidden = true), 250); return; }
-  const right = r.review.filter((x) => x.your === x.correct).length;
-  box.innerHTML = `<div class="rv-sum"><span class="ok">✔ ถูก ${right} ข้อ</span><span class="bad">✘ ผิด ${r.review.length - right} ข้อ</span></div>` +
-    r.review.map((x, i) => {
-      const q = S.quiz.questions.find((qq) => qq.id === x.id) || { question: '', choices: [] };
-      const ok = x.your === x.correct;
-      const opt = (n) => (n ? `${LETTERS[n - 1]}. ${esc(q.choices[n - 1] || '')}` : 'ไม่ได้ตอบ');
-      return `<article class="rv ${ok ? 'ok' : 'bad'}" style="--i:${i}">
-        <header><span class="rv-no">${i + 1}</span><span class="rv-tag">${ok ? 'ถูก' : 'ผิด'}</span></header>
-        <p class="rv-q">${q.question}</p>
-        ${ok ? `<p class="rv-a good">✔ ${opt(x.your)}</p>`
-             : `<p class="rv-a wrong">✘ คำตอบของคุณ: ${opt(x.your)}</p><p class="rv-a good">✔ เฉลย: ${opt(x.correct)}</p>`}
-      </article>`;
-    }).join('');
-  box.hidden = false; requestAnimationFrame(() => box.classList.add('open'));
-  setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-  mascot('play', 'nod');
 }
 
 function countUp(el, to, ms) {
