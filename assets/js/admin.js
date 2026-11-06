@@ -314,7 +314,7 @@ function renderWinners() {
   if (!S) return;
   const W = winnersList();
   $('#winCount').textContent = W.length + ' คน';
-  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked, 0, true) : '<p class="empty">ยังไม่มีผู้ขอรับรางวัล</p>';
+  $('#winners').innerHTML = W.length ? winnersHtml(W, $('#mask').checked, 0, true) : '<p class="empty">ยังไม่มีผู้ได้รับรางวัล</p>';
 }
 
 // เจ้าหน้าที่กดยืนยันการรับของ → ติ๊ก "รับของแล้ว" ในชีตให้อัตโนมัติ
@@ -372,7 +372,7 @@ async function exportPdf() {
     const W = winnersList();
     if ($('#incWin').checked && W.length) {
       for (let i = 0; i < W.length; i += 30) {
-        html += `<div data-block><h2>รายชื่อผู้ขอรับรางวัล${i ? ' (ต่อ)' : ` (${W.length} คน)`}</h2>${winnersHtml(W.slice(i, i + 30), $('#mask').checked, i)}</div>`;
+        html += `<div data-block><h2>รายชื่อผู้ได้รับรางวัล${i ? ' (ต่อ)' : ` (${W.length} คน)`}</h2>${winnersHtml(W.slice(i, i + 30), $('#mask').checked, i)}</div>`;
       }
     }
     root.innerHTML = html;

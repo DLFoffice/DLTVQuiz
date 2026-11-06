@@ -159,20 +159,9 @@ export async function submitQuiz(payload) {
     // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบถูกทุกข้อ
     const review = QUIZ.questions.map((q) => ({ id: q.id, your: payload.answers[q.id] || null, correct: payload.answers[q.id] || null }));
     return { score: 10, total: 10, perfect: true, passScore: 10, wrong: [], review, demo: true,
-      reward: { already: '', expect: 'doll', dollsLeft: 13, slotLabel: '15.00–16.59 น.', why: '' } };
+      reward: { type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-08', note: '', already: '', dollsLeft: 12 } };
   }
   return call('POST', {}, { action: 'submit', ...payload });
-}
-
-/** ขอรับรางวัล: ตุ๊กตา (10 คะแนน + มีโควตา) หรือรางวัลปลอบใจ */
-export async function claimReward(submitId, demoType = 'doll') {
-  if (DEMO) {
-    await wait(700);
-    return demoType === 'doll'
-      ? { claimed: true, type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-08', note: '', slotLabel: '15.00–16.59 น.' }
-      : { claimed: true, type: 'gift', reward: 'รางวัลปลอบใจ', code: 'GIFT-DEMO-001', note: '', slotLabel: '15.00–16.59 น.' };
-  }
-  return call('POST', {}, { action: 'claim', submitId });
 }
 
 /** ส่งแบบสอบถามความพึงพอใจ */

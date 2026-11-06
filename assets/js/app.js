@@ -1,4 +1,4 @@
-import { getQuiz, submitQuiz, checkPlayer, getStatus, claimReward, submitSurvey, DEMO } from './api.js';
+import { getQuiz, submitQuiz, checkPlayer, getStatus, submitSurvey, DEMO } from './api.js';
 
 const $ = (s) => document.querySelector(s);
 const CFG = window.DLTV_CONFIG || {};
@@ -246,6 +246,7 @@ async function send() {
 // ===================================================== ผลลัพธ์
 function showResult(r) {
   S.result = r; S.claim = null;
+  // ระบบบันทึกรางวัลแล้ว → ตัวเลขตุ๊กตาคงเหลือหน้าแรกจะอัปเดตเมื่อกลับไป
   const C = 2 * Math.PI * 70, rw = r.reward || {};
   let html = `<h2>ผลคะแนนของคุณ ${esc(S.player.name)}</h2>
     <div class="ring ${r.perfect ? '' : 'fail'}">
@@ -256,27 +257,24 @@ function showResult(r) {
   if (rw.already) {
     html += `<span class="badge bad">${r.perfect ? 'เก่งมาก! คะแนนเต็ม' : 'ขอบคุณที่ร่วมสนุก'}</span>
       <p class="muted">${esc(rw.already)} (รับรางวัลได้ 1 ครั้งต่อคน)</p>`;
-  } else if (r.perfect && rw.expect === 'doll') {
-    html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
-      <p class="muted">วันนี้เหลือตุ๊กตา ${rw.dollsLeft} ตัว</p>
-      <button class="btn btn-claim" id="bClaim"><img src="assets/img/mascot.png" alt=""><span>กดรับตุ๊กตา DLTV</span></button>`;
-  } else if (r.perfect) {
-    html += `<span class="badge ok">🎉 คะแนนเต็ม! ยินดีด้วย</span>
-      <p class="muted">${esc(rw.why)} รับรางวัลปลอบใจแทนได้เลยครับ</p>
-      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>กดรับรางวัลปลอบใจ</span></button>`;
   } else {
-    html += `<span class="badge bad">ต้องถูกครบ ${r.passScore} ข้อจึงรับตุ๊กตาได้</span>
-      <p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>
-      <button class="btn btn-claim gift" id="bClaim"><b>🎁</b><span>กดรับรางวัลปลอบใจ</span></button>
-      <p class="fine center">หรือกด "เล่นอีกครั้ง" เพื่อลุ้นตุ๊กตา · รับรางวัลได้ 1 ครั้งต่อคน</p>`;
+    // ระบบบันทึกรางวัลจากคะแนนให้แล้ว → แสดงรางวัล + ไปทำแบบสอบถาม
+    S.claim = { type: rw.type, reward: rw.reward, code: rw.code };
+    const doll = rw.type === 'doll';
+    html += `<span class="badge ok">${doll ? '🎉 คะแนนเต็ม! คุณได้รับตุ๊กตา DLTV' : r.perfect ? '🎉 คะแนนเต็ม!' : '🎁 คุณได้รับรางวัลปลอบใจ'}</span>
+      ${rw.note ? `<p class="muted">${esc(rw.note)} จึงได้รับรางวัลปลอบใจแทน</p>` : ''}
+      ${!r.perfect ? `<p class="muted">ข้อที่ยังตอบไม่ถูก: <b>${r.wrong.join(', ')}</b></p>` : ''}
+      ${ticket(S.claim)}
+      <div class="step"><b>ขั้นตอนสุดท้าย</b> ตอบแบบสอบถามความพึงพอใจ 7 ข้อ (ประมาณ 1 นาที)<br>แล้วแสดงหน้าจอสุดท้ายแก่เจ้าหน้าที่เพื่อรับ${esc(rw.reward)}</div>
+      <button class="btn btn-claim ${doll ? '' : 'gift'}" id="bToSurvey">${doll ? '<img src="assets/img/mascot.png" alt="">' : '<b>📝</b>'}<span>ทำแบบสอบถาม ▶</span></button>`;
   }
   if (r.demo) html += `<p class="muted">(โหมดทดลอง — ผลนี้เป็นตัวอย่าง)</p>`;
   if (r.review) html += `<button class="btn btn-review" id="bReview" aria-expanded="false"><span>📋 ดูเฉลยคำตอบ</span></button><div class="review" id="review" hidden></div>`;
-  html += `<div class="row"><button class="btn btn-ghost-dark" id="bAgain"><span>${r.perfect || rw.already ? 'กลับหน้าแรก' : 'เล่นอีกครั้ง'}</span></button></div>`;
+  html += `<div class="row"><button class="btn btn-ghost-dark" id="bAgain"><span>กลับหน้าแรก</span></button></div>`;
   $('#result').innerHTML = html;
   if (r.review) $('#bReview').onclick = () => toggleReview(r);
-  if ($('#bClaim')) $('#bClaim').onclick = () => claim(r.perfect && rw.expect === 'doll' ? 'doll' : 'gift');
-  $('#bAgain').onclick = () => (r.perfect || rw.already ? resetHome() : againSamePlayer());
+  if ($('#bToSurvey')) $('#bToSurvey').onclick = () => openSurvey('player');
+  $('#bAgain').onclick = () => (S.claim && !confirm('ยังไม่ได้ทำแบบสอบถาม ต้องการกลับหน้าแรกหรือไม่?') ? null : resetHome());
   go('result');
 
   setTimeout(() => {
@@ -292,39 +290,13 @@ function showResult(r) {
   }
 }
 
-// เล่นใหม่ด้วยข้อมูลเดิม (ไม่ต้องกรอกใหม่)
-function againSamePlayer() { mascot('setMood', 'idle'); startQuiz(); }
 function resetHome() {
   $('#fReg').reset(); [...$('#groups').children].forEach((x) => x.setAttribute('aria-checked', 'false'));
   S.result = S.claim = null; S.surveyKind = null;
   mascot('setMood', 'idle'); go('home'); mascot('play', 'wave'); refreshStatus();
 }
 
-// ===================================================== ขอรับรางวัล
-async function claim(expect) {
-  const btn = $('#bClaim'); if (S.busy) return;
-  S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = 'กำลังบันทึก…';
-  try {
-    const c = await claimReward(S.submitId, expect);
-    if (!c.claimed) { toast(c.reason || 'ไม่สามารถรับรางวัลได้'); btn.remove(); return; }
-    S.claim = c;
-    const doll = c.type === 'doll';
-    $('#claim').innerHTML = `
-      <div class="reward-ico ${doll ? '' : 'gift'}">${doll ? '<img src="assets/img/mascot.png" alt="">' : '🎁'}</div>
-      <h2>${doll ? 'คุณได้รับตุ๊กตา DLTV!' : 'คุณได้รับรางวัลปลอบใจ'}</h2>
-      ${c.note ? `<p class="muted">${esc(c.note)}</p>` : ''}
-      ${ticket(c)}
-      <div class="step"><b>ขั้นตอนสุดท้าย</b> ตอบแบบสอบถามความพึงพอใจ 7 ข้อ (ประมาณ 1 นาที)<br>แล้วแสดงหน้าจอสุดท้ายแก่เจ้าหน้าที่เพื่อรับของรางวัล</div>
-      <div class="row"><button class="btn btn-go" id="bToSurvey"><span>ทำแบบสอบถาม ▶</span></button></div>`;
-    $('#bToSurvey').onclick = () => openSurvey('player');
-    go('claim');
-    if (doll) { mascot('setMood', 'happy'); mascot('play', 'happy'); setTimeout(() => { confetti(); mascot('burst', 60); }, 500); }
-    else { mascot('play', 'spin'); mascot('burst', 25); }
-    setTimeout(() => say('อีกนิดเดียว ช่วยตอบแบบสอบถามหน่อยนะครับ 🙏', 3200), 1200);
-  } catch (e) {
-    toast(e.message); btn.disabled = false; btn.querySelector('span').textContent = 'ลองอีกครั้ง';
-  } finally { S.busy = false; }
-}
+// ===================================================== บัตรรางวัล
 const ticket = (c) => `<div class="ticket ${c.type === 'doll' ? '' : 'gift'}"><small>${esc(c.reward)} · รหัสรับรางวัล</small><b>${esc(c.code)}</b></div>`;
 
 // ===================================================== แบบสอบถามความพึงพอใจ
@@ -374,7 +346,7 @@ $('#svGroups').addEventListener('click', (e) => {
   [...e.currentTarget.children].forEach((x) => x.setAttribute('aria-checked', String(x === b)));
   $('#svGroupWrap').classList.remove('err');
 });
-$('#svBack').addEventListener('click', () => (S.surveyKind === 'player' && S.claim ? go('claim') : resetHome()));
+$('#svBack').addEventListener('click', () => (S.surveyKind === 'player' && S.result ? go('result') : resetHome()));
 $('#bVisitor').addEventListener('click', () => { if (S.quiz) openSurvey('visitor'); });
 
 $('#fSurvey').addEventListener('submit', async (e) => {
