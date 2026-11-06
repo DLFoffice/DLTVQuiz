@@ -108,7 +108,7 @@ const QUIZ = {
    "choices": [
     "โทรทัศน์ดาวเทียม Ku-Band (ช่อง 186 – 200)",
     "เว็บไซต์ www.dltv.ac.th",
-    "แอปพลิเคชัน DLTV และช่อง ยูทูป",
+    "ช่อง ยูทูป",
     "ถูกทุกข้อ"
    ]
   }
@@ -156,9 +156,8 @@ export async function checkPlayer(name, phone) {
 export async function submitQuiz(payload) {
   if (DEMO) {
     await wait(1200);
-    // โหมดทดลอง: ไม่มีเฉลยจริง สมมติว่าตอบถูกทุกข้อ
-    const review = QUIZ.questions.map((q) => ({ id: q.id, your: payload.answers[q.id] || null, correct: payload.answers[q.id] || null }));
-    return { score: 10, total: 10, perfect: true, passScore: 10, wrong: [], review, demo: true,
+    // โหมดทดลอง: สมมติว่าตอบถูกทุกข้อ
+    return { score: 10, total: 10, perfect: true, passScore: 10, wrong: [], review: null, demo: true,
       reward: { type: 'doll', reward: 'ตุ๊กตา DLTV', code: 'DLTV-DEMO-08', note: '', already: '', dollsLeft: 12 } };
   }
   return call('POST', {}, { action: 'submit', ...payload });
