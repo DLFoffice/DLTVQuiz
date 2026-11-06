@@ -430,7 +430,7 @@ function thStamp(s) {
   const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})/);
   return m ? `${+m[1]} ${TH_MONTH[+m[2] - 1]} ${+m[3] + (+m[3] < 2400 ? 543 : 0)} ${m[4]} น.` : s;
 }
-function phone(p, mask) { return mask ? String(p).replace(/^(\d{3})\d{3}(\d{4})$/, '$1-xxx-$2') : String(p).replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3'); }
+function phone(p, mask) { if (!p) return '<span class="muted">-</span>'; return mask ? String(p).replace(/^(\d{3})\d{3}(\d{4})$/, '$1-xxx-$2') : String(p).replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3'); }
 function wrap(s) { return String(s).match(/.{1,48}/g) || [s]; }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

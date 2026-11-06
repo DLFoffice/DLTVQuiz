@@ -148,9 +148,9 @@ export async function getQuiz() {
 }
 
 /** ตรวจว่าชื่อ/เบอร์นี้เคยได้รางวัลแล้วหรือยัง */
-export async function checkPlayer(name, phone) {
+export async function checkPlayer(name, phone, group) {
   if (DEMO) { await wait(500); return { alreadyWon: false, reason: '' }; }
-  return call('POST', {}, { action: 'check', name, phone });
+  return call('POST', {}, { action: 'check', name, phone, group });
 }
 
 export async function submitQuiz(payload) {

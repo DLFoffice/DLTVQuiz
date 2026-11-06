@@ -320,3 +320,6 @@ body[data-screen="survey"] .survey{margin-top:126px}
 .dolls.out .dolls-num b{color:#ff9ec9;text-shadow:none}
 .reg-dolls{margin:-6px 0 12px;padding:8px 12px;border-radius:12px;background:#fff8e0;color:var(--ink);font-size:14.5px}
 .reg-dolls b{font-family:Kanit;color:#c27a00;font-size:17px}
+.reg-label{margin:4px 0 6px;font-weight:600;color:var(--navy)}
+#phoneField{margin-top:10px}
+#phoneField.optional input{border-style:dashed}

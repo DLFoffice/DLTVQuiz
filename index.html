@@ -71,12 +71,13 @@
             <input id="iName" name="name" maxlength="100" placeholder=" " autocomplete="name" required>
             <label for="iName">ชื่อ-สกุล (ไม่ต้องใส่คำนำหน้า)</label>
           </div>
-          <div class="field" data-in>
-            <input id="iPhone" name="tel" type="tel" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel" required>
-            <label for="iPhone">เบอร์มือถือ 10 หลัก</label>
-          </div>
+          <p class="reg-label" data-in>ท่านเป็น</p>
           <div class="groups" id="groups" data-in role="radiogroup" aria-label="ท่านเป็น"></div>
-          <p class="fine" data-in>* 1 คน (ชื่อ-สกุล / เบอร์โทรศัพท์) รับรางวัลได้ 1 ครั้ง · ข้อมูลใช้เพื่อการจัดกิจกรรมเท่านั้น</p>
+          <div class="field" id="phoneField" data-in>
+            <input id="iPhone" name="tel" type="tel" inputmode="numeric" maxlength="10" placeholder=" " autocomplete="tel">
+            <label for="iPhone" id="phoneLabel">เบอร์มือถือ 10 หลัก</label>
+          </div>
+          <p class="fine" data-in>* 1 คน (ชื่อ-สกุล / เบอร์โทรศัพท์) รับรางวัลได้ 1 ครั้ง · นักเรียน/นักศึกษาไม่ต้องใส่เบอร์ก็ได้ · ข้อมูลใช้เพื่อการจัดกิจกรรมเท่านั้น</p>
           <div class="row" data-in>
             <button type="button" class="btn btn-ghost" data-back>ย้อนกลับ</button>
             <button type="submit" class="btn btn-go" id="bReg"><span>เริ่มตอบคำถาม</span></button>

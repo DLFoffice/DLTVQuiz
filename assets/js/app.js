@@ -109,10 +109,20 @@ $('#bStart').addEventListener('click', () => {
 document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { go('home'); mascot('play', 'wave'); }));
 
 // ===================================================== ลงทะเบียน
+// นักเรียน/นักศึกษา ไม่ต้องใส่เบอร์โทร (เด็กเล็กอาจไม่มีมือถือ) — กลุ่มอื่นต้องใส่
+const PHONE_OPTIONAL = ['นักเรียน/นักศึกษา'];
+const phoneOptional = () => { const g = $('#groups [aria-checked="true"]'); return !!g && PHONE_OPTIONAL.includes(g.textContent); };
+function updatePhoneLabel() {
+  const opt = phoneOptional();
+  $('#phoneLabel').textContent = opt ? 'เบอร์มือถือ (ไม่บังคับสำหรับนักเรียน)' : 'เบอร์มือถือ 10 หลัก';
+  $('#phoneField').classList.toggle('optional', opt);
+  if (opt) $('#phoneField').classList.remove('err');
+}
 $('#groups').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   [...e.currentTarget.children].forEach((x) => x.setAttribute('aria-checked', String(x === b)));
   e.currentTarget.classList.remove('err');
+  updatePhoneLabel();
   mascot('play', 'nod');
 });
 $('#iPhone').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d]/g, '').slice(0, 10); });
@@ -139,15 +149,16 @@ $('#fReg').addEventListener('submit', async (e) => {
   document.querySelectorAll('.field').forEach((f) => f.classList.remove('err'));
   const ne = nameError(name);
   if (ne) return fail($('#iName').parentElement, ne);
-  if (!/^0[689]\d{8}$/.test(phone)) return fail($('#iPhone').parentElement, 'กรุณากรอกเบอร์มือถือ 10 หลักให้ถูกต้อง');
   if (!groupBtn) return fail($('#groups'), 'กรุณาเลือกกลุ่มผู้เข้าร่วม');
+  if (!(phone === '' && phoneOptional()) && !/^0[689]\d{8}$/.test(phone))
+    return fail($('#iPhone').parentElement, phone === '' ? 'กรุณากรอกเบอร์มือถือ' : 'กรุณากรอกเบอร์มือถือ 10 หลักให้ถูกต้อง');
   S.player = { name, phone, group: groupBtn.textContent };
 
   // ตรวจชื่อ/เบอร์ซ้ำกับผู้ที่ได้รับรางวัลแล้ว
   const btn = $('#bReg'), label = btn.querySelector('span').textContent;
   S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = 'กำลังตรวจสอบ…';
   try {
-    const r = await checkPlayer(name, phone);
+    const r = await checkPlayer(name, phone, S.player.group);
     if (r.alreadyWon) { showModal(r.reason); return; }
     startQuiz();
   } catch (err) {
@@ -292,7 +303,7 @@ function showResult(r) {
 }
 
 function resetHome() {
-  $('#fReg').reset(); [...$('#groups').children].forEach((x) => x.setAttribute('aria-checked', 'false'));
+  $('#fReg').reset(); [...$('#groups').children].forEach((x) => x.setAttribute('aria-checked', 'false')); updatePhoneLabel();
   S.result = S.claim = null; S.surveyKind = null;
   mascot('setMood', 'idle'); go('home'); mascot('play', 'wave'); refreshStatus();
 }
