@@ -139,7 +139,9 @@ async function call(method, params, body, tries = 4) {
 
 /** ช่วงเวลาปัจจุบัน + ตุ๊กตาคงเหลือ (เรียกตอนเปิดหน้าเว็บ — ช่วยปลุกเซิร์ฟเวอร์ GAS ด้วย) */
 export async function getStatus() {
-  if (DEMO) return { slot: 2, slotLabel: '15.00–16.59 น.', dollsLeft: 3, dollsPerSlot: 5 };
+  if (DEMO) return { slot: 2, slotLabel: '15.00–16.59 น.', dollsLeft: 3, dollsPerSlot: 5, todayLeft: 8, todayTotal: 20, todayGiven: 9,
+    slots: [{ label: '11.00–12.59 น.', total: 5, given: 5, left: 0, state: 'past' }, { label: '13.00–14.59 น.', total: 5, given: 2, left: 0, state: 'past' },
+            { label: '15.00–16.59 น.', total: 5, given: 2, left: 3, state: 'now' }, { label: '17.00–21.00 น.', total: 5, given: 0, left: 5, state: 'upcoming' }] };
   return call('GET', { action: 'status' }, null, 2);
 }
 

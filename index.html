@@ -49,7 +49,15 @@
           <div class="chip chip-doll"><img src="assets/img/mascot.png" alt="" class="chip-ico"><small>ถูกครบ 10 ข้อ<br>รับตุ๊กตา DLTV</small></div>
           <div class="chip"><b>🎁</b><small>ร่วมสนุก<br>รับรางวัลปลอบใจ</small></div>
         </div>
-        <p class="slot-info" id="slotInfo" data-in hidden></p>
+        <div class="dolls" id="dolls" data-in hidden>
+          <div class="dolls-top">
+            <img src="assets/img/mascot.png" alt="" class="dolls-ico">
+            <div class="dolls-num"><small>วันนี้เหลือตุ๊กตา DLTV</small><b><span id="dLeft">0</span><em> / <span id="dTotal">20</span> ตัว</em></b></div>
+          </div>
+          <div class="dolls-bar"><i id="dBar"></i></div>
+          <div class="dolls-slots" id="dSlots"></div>
+          <p class="dolls-note" id="dNote"></p>
+        </div>
         <button class="btn btn-go" id="bStart" data-in disabled><span>กำลังโหลด…</span></button>
         <button class="btn btn-soft" id="bVisitor" data-in><span>ผู้เยี่ยมชมบูธ · ทำแบบสอบถามความพึงพอใจ</span></button>
         <p class="hint" data-in>แตะที่น้อง DLTV หรือปัดซ้าย-ขวาเพื่อหมุนตัว</p>
@@ -59,6 +67,7 @@
       <section id="sReg" class="screen">
         <form id="fReg" class="card" autocomplete="on" novalidate>
           <h2 data-in>ลงทะเบียนก่อนเริ่มภารกิจ 🚀</h2>
+          <p class="reg-dolls" id="regDolls" data-in hidden></p>
           <div class="field" data-in>
             <input id="iName" name="name" maxlength="100" placeholder=" " autocomplete="name" required>
             <label for="iName">ชื่อ-สกุล (ไม่ต้องใส่คำนำหน้า)</label>

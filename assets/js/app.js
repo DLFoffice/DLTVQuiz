@@ -70,20 +70,45 @@ async function boot() {
   }
 }
 
-// ช่วงเวลาปัจจุบัน + ตุ๊กตาคงเหลือ (ช่วยปลุกเซิร์ฟเวอร์ด้วย)
+// ตุ๊กตาคงเหลือวันนี้ (แสดงหน้าแรก + หน้าลงทะเบียน) — โหลดตอนเปิดหน้าและทุก 1 นาที (ช่วยปลุกเซิร์ฟเวอร์ด้วย)
+let statusTimer;
 async function refreshStatus() {
-  try {
-    const st = await getStatus(), el = $('#slotInfo');
-    el.innerHTML = st.slot >= 0
-      ? `ช่วงเวลา ${esc(st.slotLabel)} · ตุ๊กตาคงเหลือ <b>${st.dollsLeft}/${st.dollsPerSlot}</b> ตัว`
-      : `ขณะนี้${esc(st.slotLabel)} · ร่วมสนุกรับรางวัลปลอบใจได้`;
-    el.classList.toggle('empty', st.dollsLeft === 0);
-    el.hidden = false;
-  } catch (e) { /* ไม่แสดงถ้าโหลดไม่ได้ */ }
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(refreshStatus, 60000);
+  if (document.hidden || !['home', 'reg'].includes(document.body.dataset.screen)) return;
+  try { renderStatus(await getStatus()); } catch (e) { /* ไม่แสดงถ้าโหลดไม่ได้ */ }
 }
+function renderStatus(st) {
+  if (!st.slots) return;
+  const box = $('#dolls');
+  countTo($('#dLeft'), st.todayLeft);
+  $('#dTotal').textContent = st.todayTotal;
+  $('#dBar').style.width = (st.todayTotal ? (st.todayLeft / st.todayTotal) * 100 : 0) + '%';
+  box.classList.toggle('out', st.todayLeft === 0);
+  $('#dSlots').innerHTML = st.slots.map((x) => {
+    const tag = x.state === 'now' ? 'ตอนนี้' : x.state === 'past' ? 'ผ่านไปแล้ว' : 'รอบถัดไป';
+    const val = x.state === 'past' ? `แจกแล้ว ${x.given}` : `เหลือ <b>${x.left}</b>/${x.total}`;
+    return `<div class="ds ${x.state}${x.state !== 'past' && !x.left ? ' empty' : ''}"><span class="ds-time">${esc(x.label.replace(' น.', ''))}</span><span class="ds-val">${val}</span><small>${tag}</small></div>`;
+  }).join('');
+  const now = st.slots.find((x) => x.state === 'now'), next = st.slots.find((x) => x.state === 'upcoming');
+  $('#dNote').textContent = now
+    ? (now.left ? `ช่วงนี้แจกอีก ${now.left} ตัว · ตอบถูกครบ 10 ข้อ รับเลย!` : `ช่วงนี้ตุ๊กตาหมดแล้ว${next ? ' · รอบถัดไป ' + next.label : ''} · ร่วมสนุกรับรางวัลปลอบใจได้`)
+    : next ? `เริ่มแจกตุ๊กตาช่วง ${next.label} · ตอนนี้ร่วมสนุกรับรางวัลปลอบใจได้` : 'วันนี้หมดช่วงเวลาแจกตุ๊กตาแล้ว · ขอบคุณที่ร่วมสนุกครับ';
+  box.hidden = false;
+  const r = $('#regDolls');
+  r.innerHTML = `🧸 วันนี้เหลือตุ๊กตา <b>${st.todayLeft}</b> ตัว` + (now ? ` · ช่วงนี้ <b>${now.left}</b> ตัว` : '');
+  r.hidden = false;
+}
+function countTo(el, to) {
+  const from = +el.textContent || 0; if (from === to) return;
+  const t0 = performance.now();
+  const step = (t) => { const p = Math.min((t - t0) / 700, 1); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshStatus(); });
 
 $('#bStart').addEventListener('click', () => {
-  go('reg'); mascot('play', 'jump');
+  go('reg'); mascot('play', 'jump'); refreshStatus();
   setTimeout(() => say('บอกชื่อน้องหน่อยนะครับ 😊'), 700);
   setTimeout(() => $('#iName').focus({ preventScroll: true }), 900);
 });
