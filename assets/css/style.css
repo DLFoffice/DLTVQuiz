@@ -341,3 +341,11 @@ body.theme-learning .nebula{background:radial-gradient(28% 22% at 20% 35%,rgba(2
 body.theme-learning{--rainbow:linear-gradient(90deg,#ffd6a5,#ffb3d9,#cdb8ff,#a8d8ff,#b5f0dc)}
 body.theme-learning .title span{background-image:linear-gradient(90deg,#ffd6a5,#ffb3d9,#cdb8ff,#ffd6a5)}
 body.theme-learning .stage-ring{background:radial-gradient(closest-side,rgba(255,158,207,.35),rgba(142,240,208,.18) 55%,transparent)}
+
+/* ปุ่มสลับภาษา (แสดงเฉพาะหน้าแรก/ลงทะเบียน) */
+.lang-btn{flex:0 0 auto;margin-left:8px;border:2px solid var(--blue2);background:#fff;color:var(--blue);font-family:Kanit;font-weight:600;font-size:14px;
+  border-radius:99px;padding:4px 11px;cursor:pointer;transition:all .2s var(--spring)}
+.lang-btn:hover{background:var(--blue2);color:#fff}
+.lang-btn:active{transform:scale(.94)}
+body:not([data-screen="home"]):not([data-screen="reg"]) .lang-btn{visibility:hidden}
+@media (max-width:380px){.topbar-text{display:none}}

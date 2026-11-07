@@ -1,5 +1,6 @@
 import { getQuiz, submitQuiz, checkPlayer, getStatus, submitSurvey, DEMO } from './api.js';
 import { themeOfToday } from './theme-day.js';
+import { t, getLang, setLang, applyStatic, localQ, groupLabel, surveyItem, rewardName, srv } from './i18n.js';
 
 const $ = (s) => document.querySelector(s);
 const CFG = window.DLTV_CONFIG || {};
@@ -7,7 +8,6 @@ const CFG = window.DLTV_CONFIG || {};
 const THEME = themeOfToday((window.DLTV_CONFIG || {}).THEME || 'auto');
 document.body.classList.add('theme-' + THEME);
 const S = { quiz: null, idx: 0, answers: {}, player: {}, startedAt: 0, busy: false, mascot: null };
-const LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
 // ===================================================== น้อง DLTV 3D
 async function initMascot() {
@@ -56,21 +56,37 @@ function toast(msg) {
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+// ===================================================== ภาษา
+// ปุ่มกลุ่ม: แสดงตามภาษา แต่เก็บค่าภาษาไทยใน data-g (ส่งให้เซิร์ฟเวอร์ค่าเดิม)
+function renderGroups(box) {
+  const cur = box.querySelector('[aria-checked="true"]');
+  box.innerHTML = S.quiz.groups.map((g) => `<button type="button" role="radio" aria-checked="${cur && cur.dataset.g === g}" data-g="${esc(g)}">${esc(groupLabel(g))}</button>`).join('');
+}
+function applyLang() {
+  applyStatic();
+  if (S.quiz) { renderGroups($('#groups')); if (S.surveyKind === 'visitor') renderGroups($('#svGroups')); }
+  if (S.quiz && !$('#bStart').disabled) $('#bStart span').textContent = t('start');
+  updatePhoneLabel();
+  if (S.lastStatus) renderStatus(S.lastStatus);
+}
+$('#langBtn').addEventListener('click', () => { setLang(getLang() === 'th' ? 'en' : 'th'); applyLang(); mascot('play', 'spin'); say(t('sayHello'), 2200); });
+applyStatic();
+
 // ===================================================== หน้าแรก
 async function boot() {
   if (DEMO) $('#demo').hidden = false;
   initMascot();
   refreshStatus();
-  setTimeout(() => say('สวัสดีครับ! มาตอบคำถามกับน้อง DLTV กัน 🛰️'), 900);
+  setTimeout(() => say(t('sayHello')), 900);
   try {
     S.quiz = await getQuiz();
     $('#hQ').textContent = S.quiz.questions.length;
     $('#qTotal').textContent = S.quiz.questions.length;
-    $('#groups').innerHTML = S.quiz.groups.map((g) => `<button type="button" role="radio" aria-checked="false">${esc(g)}</button>`).join('');
-    const b = $('#bStart'); b.disabled = false; b.querySelector('span').textContent = 'เริ่มภารกิจ 🚀';
+    renderGroups($('#groups'));
+    const b = $('#bStart'); b.disabled = false; b.querySelector('span').dataset.i18n = 'start'; b.querySelector('span').textContent = t('start');
   } catch (e) {
-    $('#bStart span').textContent = 'โหลดข้อมูลไม่สำเร็จ';
-    toast(e.message);
+    $('#bStart span').textContent = t('loadFail');
+    toast(srv(e.message));
   }
 }
 
@@ -89,12 +105,11 @@ function renderStatus(st) {
   $('#dTotal').textContent = st.todayTotal;
   $('#dBar').style.width = (st.todayTotal ? (st.todayLeft / st.todayTotal) * 100 : 0) + '%';
   box.classList.toggle('out', st.todayLeft === 0);
-  $('#dNote').textContent = st.todayLeft
-    ? `แจกไปแล้ว ${st.todayGiven} ตัว · ตอบถูกครบ 10 ข้อ รับเลย! (แจกจนกว่าจะหมด)`
-    : 'ตุ๊กตาของวันนี้หมดแล้ว · ร่วมสนุกรับรางวัลปลอบใจได้ครับ';
+  S.lastStatus = st;
+  $('#dNote').textContent = st.todayLeft ? t('dollsNote', { n: st.todayGiven }) : t('dollsOut');
   box.hidden = false;
   const r = $('#regDolls');
-  r.innerHTML = st.todayLeft ? `🧸 วันนี้เหลือตุ๊กตา <b>${st.todayLeft}</b> ตัว` : '🧸 ตุ๊กตาของวันนี้หมดแล้ว · ยังร่วมสนุกรับรางวัลปลอบใจได้';
+  r.innerHTML = st.todayLeft ? t('regDolls', { n: st.todayLeft }) : t('regDollsOut');
   r.hidden = false;
 }
 function countTo(el, to) {
@@ -107,7 +122,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 
 $('#bStart').addEventListener('click', () => {
   go('reg'); mascot('play', 'jump'); refreshStatus();
-  setTimeout(() => say('บอกชื่อน้องหน่อยนะครับ 😊'), 700);
+  setTimeout(() => say(t('sayName')), 700);
   setTimeout(() => $('#iName').focus({ preventScroll: true }), 900);
 });
 document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { go('home'); mascot('play', 'wave'); }));
@@ -115,10 +130,10 @@ document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('clic
 // ===================================================== ลงทะเบียน
 // นักเรียน/นักศึกษา ไม่ต้องใส่เบอร์โทร (เด็กเล็กอาจไม่มีมือถือ) — กลุ่มอื่นต้องใส่
 const PHONE_OPTIONAL = ['นักเรียน/นักศึกษา'];
-const phoneOptional = () => { const g = $('#groups [aria-checked="true"]'); return !!g && PHONE_OPTIONAL.includes(g.textContent); };
+const phoneOptional = () => { const g = $('#groups [aria-checked="true"]'); return !!g && PHONE_OPTIONAL.includes(g.dataset.g); };
 function updatePhoneLabel() {
   const opt = phoneOptional();
-  $('#phoneLabel').textContent = opt ? 'เบอร์มือถือ (ไม่บังคับสำหรับนักเรียน)' : 'เบอร์มือถือ 10 หลัก';
+  $('#phoneLabel').textContent = opt ? t('phoneOpt') : t('phone');
   $('#phoneField').classList.toggle('optional', opt);
   if (opt) $('#phoneField').classList.remove('err');
 }
@@ -137,9 +152,9 @@ const NAME_PREFIX = /^(นาย|นางสาว|นาง|น\.ส\.|นส\
 function nameError(raw) {
   const n = raw.replace(/\s+/g, ' ').trim().replace(NAME_PREFIX, '');
   const parts = n.split(' ').filter(Boolean);
-  if (!n) return 'กรุณากรอกชื่อ-สกุล';
-  if (!/^[\u0E00-\u0E7Fa-zA-Z.\s'-]+$/.test(n)) return 'ชื่อ-สกุลต้องเป็นตัวอักษรไทยหรืออังกฤษเท่านั้น';
-  if (parts.length < 2 || parts.some((x) => x.length < 2)) return 'กรุณากรอกทั้งชื่อและนามสกุล (เว้นวรรค 1 ช่อง)';
+  if (!n) return t('errName');
+  if (!/^[\u0E00-\u0E7Fa-zA-Z.\s'-]+$/.test(n)) return t('errNameChar');
+  if (parts.length < 2 || parts.some((x) => x.length < 2)) return t('errNameFull');
   return '';
 }
 
@@ -153,20 +168,20 @@ $('#fReg').addEventListener('submit', async (e) => {
   document.querySelectorAll('.field').forEach((f) => f.classList.remove('err'));
   const ne = nameError(name);
   if (ne) return fail($('#iName').parentElement, ne);
-  if (!groupBtn) return fail($('#groups'), 'กรุณาเลือกกลุ่มผู้เข้าร่วม');
+  if (!groupBtn) return fail($('#groups'), t('errGroup'));
   if (!(phone === '' && phoneOptional()) && !/^0[689]\d{8}$/.test(phone))
-    return fail($('#iPhone').parentElement, phone === '' ? 'กรุณากรอกเบอร์มือถือ' : 'กรุณากรอกเบอร์มือถือ 10 หลักให้ถูกต้อง');
-  S.player = { name, phone, group: groupBtn.textContent };
+    return fail($('#iPhone').parentElement, phone === '' ? t('errPhoneEmpty') : t('errPhone'));
+  S.player = { name, phone, group: groupBtn.dataset.g };
 
   // ตรวจชื่อ/เบอร์ซ้ำกับผู้ที่ได้รับรางวัลแล้ว
   const btn = $('#bReg'), label = btn.querySelector('span').textContent;
-  S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = 'กำลังตรวจสอบ…';
+  S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = t('checking');
   try {
     const r = await checkPlayer(name, phone, S.player.group);
     if (r.alreadyWon) { showModal(r.reason); return; }
     startQuiz();
   } catch (err) {
-    toast(err.message); mascot('play', 'shake');
+    toast(srv(err.message)); mascot('play', 'shake');
   } finally {
     S.busy = false; btn.disabled = false; btn.querySelector('span').textContent = label;
   }
@@ -181,11 +196,11 @@ function startQuiz() {
   S.submitId = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   renderQ(false);
   go('quiz'); mascot('play', 'spin'); mascot('burst', 18);
-  setTimeout(() => say('สู้ ๆ นะครับ! ✨', 1800), 800);
+  setTimeout(() => say(t('sayGo'), 1800), 800);
 }
 
 function showModal(reason) {
-  $('#mText').innerHTML = esc(reason) + '<br>จึงไม่สามารถรับรางวัลซ้ำได้ แต่ยังร่วมสนุกทดสอบความรู้ได้นะครับ';
+  $('#mText').innerHTML = t('mText', { r: esc(srv(reason)) });
   const m = $('#modal'); m.hidden = false; requestAnimationFrame(() => m.classList.add('show'));
   mascot('play', 'shake');
 }
@@ -200,11 +215,12 @@ function renderQ(animate = true, back = false) {
   const paint = () => {
     const no = $('#qNo'); no.textContent = S.idx + 1; no.classList.remove('pop'); void no.offsetWidth; no.classList.add('pop');
     $('#track').style.width = ((S.idx + 1) / n) * 100 + '%';
-    $('#qText').innerHTML = q.question; // ข้อความจากผู้ดูแลระบบ (มีแท็ก <u>)
+    const lq = localQ(q);
+    $('#qText').innerHTML = lq.question; // ข้อความจากผู้ดูแลระบบ (มีแท็ก <u>)
     $('#qChoices').innerHTML = q.opts.map((o, i) =>
-      `<button type="button" class="choice c${i + 1}${S.answers[q.id] === o + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${o + 1}"><span class="k">${LETTERS[i]}</span><span>${esc(q.choices[o])}</span></button>`).join('');
+      `<button type="button" class="choice c${i + 1}${S.answers[q.id] === o + 1 ? ' sel' : ''}" style="--i:${i}" data-v="${o + 1}"><span class="k">${t('letters')[i]}</span><span>${esc(lq.choices[o])}</span></button>`).join('');
     $('#bPrev').style.visibility = S.idx ? 'visible' : 'hidden';
-    $('#bNext span').textContent = S.idx === n - 1 ? 'ส่งคำตอบ ✔' : 'ถัดไป';
+    $('#bNext span').textContent = S.idx === n - 1 ? t('submit') : t('next');
   };
   if (!animate) return paint();
   card.className = 'card qcard out' + (back ? ' back' : '');
@@ -231,12 +247,12 @@ $('#bNext').addEventListener('click', () => {
   const q = S.qs[S.idx];
   if (!S.answers[q.id]) {
     const c = $('#qCard'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
-    toast('คุณยังไม่ได้เลือกคำตอบ'); mascot('play', 'shake'); say('เลือกคำตอบก่อนนะครับ 🙏', 1600);
+    toast(t('errPick')); mascot('play', 'shake'); say(t('sayPick'), 1600);
     return;
   }
   if (S.idx < S.qs.length - 1) {
     S.idx++; renderQ(true);
-    const cheers = ['เยี่ยมไปเลย!', 'ไปต่อกัน!', 'เก่งมากครับ 👍', 'อีกนิดเดียว!', 'ใกล้แล้ว ๆ'];
+    const cheers = t('cheers');
     if (S.idx % 3 === 0) say(cheers[(S.idx / 3) % cheers.length | 0], 1500);
     return;
   }
@@ -247,15 +263,15 @@ $('#bNext').addEventListener('click', () => {
 async function send() {
   if (S.busy) return; S.busy = true;
   go('send'); mascot('setSignal', 4); mascot('play', 'wave');
-  say('กำลังส่งสัญญาณ…', 1600);
+  say(t('saySend'), 1600);
   const t0 = Date.now();
   try {
-    const r = await submitQuiz({ ...S.player, answers: S.answers, startedAt: S.startedAt, submitId: S.submitId });
+    const r = await submitQuiz({ ...S.player, answers: S.answers, startedAt: S.startedAt, submitId: S.submitId, lang: getLang() });
     await new Promise((ok) => setTimeout(ok, Math.max(0, 1500 - (Date.now() - t0)))); // ให้แอนิเมชันเล่นจบ
     showResult(r);
   } catch (e) {
-    $('#result').innerHTML = `<h2>ส่งคำตอบไม่สำเร็จ</h2><p class="muted">${esc(e.message)}</p>
-      <div class="row"><button class="btn btn-go" id="bRetry"><span>ลองส่งอีกครั้ง</span></button></div>`;
+    $('#result').innerHTML = `<h2>${t('sendFail')}</h2><p class="muted">${esc(srv(e.message))}</p>
+      <div class="row"><button class="btn btn-go" id="bRetry"><span>${t('retry')}</span></button></div>`;
     go('result'); mascot('setMood', 'sad');
     $('#bRetry').onclick = () => { mascot('setMood', 'idle'); send(); };
   } finally { S.busy = false; mascot('setSignal', 1); }
@@ -266,31 +282,31 @@ function showResult(r) {
   S.result = r; S.claim = null;
   // ระบบบันทึกรางวัลแล้ว → ตัวเลขตุ๊กตาคงเหลือหน้าแรกจะอัปเดตเมื่อกลับไป
   const C = 2 * Math.PI * 70, rw = r.reward || {};
-  let html = `<h2>ผลคะแนนของคุณ ${esc(S.player.name)}</h2>
+  let html = `<h2>${t('resultOf', { name: esc(S.player.name) })}</h2>
     <div class="ring ${r.perfect ? '' : 'fail'}">
       <svg viewBox="0 0 170 170"><defs><linearGradient id="gradY" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ffd23f"/><stop offset=".5" stop-color="#ff8a00"/><stop offset="1" stop-color="#ff4fa3"/></linearGradient></defs>
         <circle class="bg" cx="85" cy="85" r="70"/><circle class="fg" cx="85" cy="85" r="70" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
-      <div class="val"><div><b id="scoreNum">0</b><small>จาก ${r.total}</small></div></div>
+      <div class="val"><div><b id="scoreNum">0</b><small>${t('of', { n: r.total })}</small></div></div>
     </div>`;
   if (rw.already) {
-    html += `<span class="badge bad">${r.perfect ? 'เก่งมาก! คะแนนเต็ม' : 'ขอบคุณที่ร่วมสนุก'}</span>
-      <p class="muted">${esc(rw.already)} (รับรางวัลได้ 1 ครั้งต่อคน)</p>`;
+    html += `<span class="badge bad">${r.perfect ? t('greatPerfect') : t('thanksPlay')}</span>
+      <p class="muted">${esc(srv(rw.already))} ${t('oncePer')}</p>`;
   } else {
     // ระบบบันทึกรางวัลจากคะแนนให้แล้ว → แสดงรางวัล + ไปทำแบบสอบถาม
-    S.claim = { type: rw.type, reward: rw.reward, code: rw.code };
+    S.claim = { type: rw.type, reward: rewardName(rw.type), code: rw.code };
     const doll = rw.type === 'doll';
-    html += `<span class="badge ok">${doll ? '🎉 คะแนนเต็ม! คุณได้รับตุ๊กตา DLTV' : r.perfect ? '🎉 คะแนนเต็ม!' : '🎁 คุณได้รับรางวัลปลอบใจ'}</span>
-      ${rw.note ? `<p class="muted">${esc(rw.note)} จึงได้รับรางวัลปลอบใจแทน</p>` : ''}
+    html += `<span class="badge ok">${doll ? t('gotDoll') : r.perfect ? t('perfect') : t('gotGift')}</span>
+      ${rw.note ? `<p class="muted">${t('insteadGift', { note: esc(srv(rw.note)) })}</p>` : ''}
       ${ticket(S.claim)}
-      <div class="step"><b>ขั้นตอนสุดท้าย</b> ตอบแบบสอบถามความพึงพอใจ 7 ข้อ (ประมาณ 1 นาที)<br>แล้วแสดงหน้าจอสุดท้ายแก่เจ้าหน้าที่เพื่อรับ${esc(rw.reward)}</div>
-      <button class="btn btn-claim ${doll ? '' : 'gift'}" id="bToSurvey">${doll ? '<img src="assets/img/mascot.png" alt="">' : '<b>📝</b>'}<span>ทำแบบสอบถาม ▶</span></button>`;
+      <div class="step">${t('step', { reward: esc(S.claim.reward) })}</div>
+      <button class="btn btn-claim ${doll ? '' : 'gift'}" id="bToSurvey">${doll ? '<img src="assets/img/mascot.png" alt="">' : '<b>📝</b>'}<span>${t('doSurvey')}</span></button>`;
   }
-  if (r.demo) html += `<p class="muted">(โหมดทดลอง — ผลนี้เป็นตัวอย่าง)</p>`;
+  if (r.demo) html += `<p class="muted">${t('demoResult')}</p>`;
   // ไม่แสดงเฉลย/ข้อที่ผิด (กันการจำคำตอบแล้วมาเล่นใหม่) — ไม่ว่าเซิร์ฟเวอร์จะส่งมาหรือไม่
-  html += `<div class="row"><button class="btn btn-ghost-dark" id="bAgain"><span>กลับหน้าแรก</span></button></div>`;
+  html += `<div class="row"><button class="btn btn-ghost-dark" id="bAgain"><span>${t('home')}</span></button></div>`;
   $('#result').innerHTML = html;
   if ($('#bToSurvey')) $('#bToSurvey').onclick = () => openSurvey('player');
-  $('#bAgain').onclick = () => (S.claim && !confirm('ยังไม่ได้ทำแบบสอบถาม ต้องการกลับหน้าแรกหรือไม่?') ? null : resetHome());
+  $('#bAgain').onclick = () => (S.claim && !confirm(t('confirmHome')) ? null : resetHome());
   go('result');
 
   setTimeout(() => {
@@ -299,10 +315,10 @@ function showResult(r) {
   }, 450);
   if (r.perfect) {
     mascot('setMood', 'happy'); mascot('play', 'happy');
-    setTimeout(() => { confetti(); mascot('burst', 50); say('คะแนนเต็ม! เก่งที่สุดเลย 🎉', 3500); }, 900);
+    setTimeout(() => { confetti(); mascot('burst', 50); say(t('sayPerfect'), 3500); }, 900);
   } else {
     mascot('play', 'jump');
-    setTimeout(() => say('ได้ ' + r.score + ' คะแนน เก่งมากครับ 👏', 3000), 900);
+    setTimeout(() => say(t('sayScore', { n: r.score }), 3000), 900);
   }
 }
 
@@ -313,7 +329,7 @@ function resetHome() {
 }
 
 // ===================================================== บัตรรางวัล
-const ticket = (c) => `<div class="ticket ${c.type === 'doll' ? '' : 'gift'}"><small>${esc(c.reward)} · รหัสรับรางวัล</small><b>${esc(c.code)}</b></div>`;
+const ticket = (c) => `<div class="ticket ${c.type === 'doll' ? '' : 'gift'}"><small>${esc(c.reward)} · ${t('code')}</small><b>${esc(c.code)}</b></div>`;
 
 // ===================================================== แบบสอบถามความพึงพอใจ
 const SURVEY_ITEMS = [
@@ -325,28 +341,28 @@ const SURVEY_ITEMS = [
   'เจ้าหน้าที่ประจำบูธให้ข้อมูลและอำนวยความสะดวกได้อย่างสุภาพและเหมาะสม',
   'โดยภาพรวม ท่านมีความพึงพอใจต่อการจัดแสดงนิทรรศการของมูลนิธิฯ',
 ];
-const LEVELS = [[5, 'มากที่สุด'], [4, 'มาก'], [3, 'ปานกลาง'], [2, 'น้อย'], [1, 'น้อยที่สุด']];
+const LEVELS = [5, 4, 3, 2, 1];
 
 function openSurvey(kind) {
   S.surveyKind = kind; S.ratings = new Array(SURVEY_ITEMS.length).fill(0);
   S.surveyId = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   $('#svGroupWrap').hidden = kind !== 'visitor';
-  if (kind === 'visitor') $('#svGroups').innerHTML = S.quiz.groups.map((g) => `<button type="button" role="radio" aria-checked="false">${esc(g)}</button>`).join('');
-  $('#svItems').innerHTML = SURVEY_ITEMS.map((t, i) => `
+  if (kind === 'visitor') renderGroups($('#svGroups'));
+  $('#svItems').innerHTML = SURVEY_ITEMS.map((txt, i) => `
     <fieldset class="sv-item" data-i="${i}" data-in>
-      <legend><span class="sv-no">${i + 1}</span>${esc(t)}</legend>
-      <div class="scale" role="radiogroup">${LEVELS.map(([v, l]) =>
-        `<button type="button" role="radio" aria-checked="false" data-v="${v}" class="lv${v}"><b>${v}</b><small>${l}</small></button>`).join('')}</div>
+      <legend><span class="sv-no">${i + 1}</span>${esc(surveyItem(i, txt))}</legend>
+      <div class="scale" role="radiogroup">${LEVELS.map((v, li) =>
+        `<button type="button" role="radio" aria-checked="false" data-v="${v}" class="lv${v}"><b>${v}</b><small>${t('levels')[li]}</small></button>`).join('')}</div>
     </fieldset>`).join('');
   $('#svSuggest').value = '';
   svProgress();
   go('survey');
   mascot('play', 'wave');
-  setTimeout(() => say(kind === 'visitor' ? 'ขอบคุณที่แวะมาเยี่ยมชมบูธครับ 😊' : 'เลือกได้เลยครับ 1–5', 2500), 800);
+  setTimeout(() => say(kind === 'visitor' ? t('sayVisitor') : t('sayRate'), 2500), 800);
 }
 function svProgress() {
   const n = S.ratings.filter(Boolean).length;
-  $('#svProgress').textContent = `ตอบแล้ว ${n}/${SURVEY_ITEMS.length} ข้อ`;
+  $('#svProgress').textContent = t('svProgress', { n, t: SURVEY_ITEMS.length });
 }
 $('#svItems').addEventListener('click', (e) => {
   const b = e.target.closest('.scale button'); if (!b) return;
@@ -371,38 +387,38 @@ $('#fSurvey').addEventListener('submit', async (e) => {
   const group = $('#svGroups [aria-checked="true"]');
   if (S.surveyKind === 'visitor' && !group) {
     const w = $('#svGroupWrap'); w.classList.remove('err'); void w.offsetWidth; w.classList.add('err');
-    w.scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('กรุณาเลือกกลุ่มผู้เข้าร่วม');
+    w.scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast(t('errGroup'));
   }
   const miss = S.ratings.findIndex((x) => !x);
   if (miss >= 0) {
     const f = document.querySelector(`.sv-item[data-i="${miss}"]`); f.classList.remove('err'); void f.offsetWidth; f.classList.add('err');
     f.scrollIntoView({ behavior: 'smooth', block: 'center' }); mascot('play', 'shake');
-    return toast(`กรุณาให้คะแนนข้อ ${miss + 1}`);
+    return toast(t('svRate', { n: miss + 1 }));
   }
-  const btn = $('#svSend'); S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = 'กำลังส่ง…';
+  const btn = $('#svSend'); S.busy = true; btn.disabled = true; btn.querySelector('span').textContent = t('svSending');
   try {
     await submitSurvey({ surveyId: S.surveyId, kind: S.surveyKind, submitId: S.surveyKind === 'player' ? S.submitId : '',
-      group: group ? group.textContent : '', ratings: S.ratings, suggestion: $('#svSuggest').value.trim() });
+      group: group ? group.dataset.g : '', ratings: S.ratings, suggestion: $('#svSuggest').value.trim(), lang: getLang() });
     showThanks();
-  } catch (err) { toast(err.message); }
-  finally { S.busy = false; btn.disabled = false; btn.querySelector('span').textContent = 'ส่งแบบสอบถาม'; }
+  } catch (err) { toast(srv(err.message)); }
+  finally { S.busy = false; btn.disabled = false; btn.querySelector('span').textContent = t('svSend'); }
 });
 
 function showThanks() {
   const c = S.surveyKind === 'player' ? S.claim : null;
   $('#thanks').innerHTML = c
     ? `<div class="reward-ico ${c.type === 'doll' ? '' : 'gift'}">${c.type === 'doll' ? '<img src="assets/img/mascot.png" alt="">' : '🎁'}</div>
-       <h2>ขอบคุณที่ร่วมกิจกรรมครับ</h2>
-       <p class="muted">กรุณา<b>แสดงหน้าจอนี้แก่เจ้าหน้าที่</b>เพื่อรับ${esc(c.reward)}</p>
+       <h2>${t('thanksTitle')}</h2>
+       <p class="muted">${t('showStaff', { reward: esc(c.reward) })}</p>
        ${ticket(c)}
        <p class="fine center">${esc(S.player.name)}</p>`
-    : `<div class="reward-ico">💙</div><h2>ขอบคุณสำหรับความคิดเห็นครับ</h2>
-       <p class="muted">ความคิดเห็นของท่านจะนำไปพัฒนาการจัดนิทรรศการของมูลนิธิฯ ต่อไป</p>`;
-  $('#thanks').innerHTML += `<div class="row"><button class="btn btn-go" id="bHome"><span>กลับหน้าแรก</span></button></div>`;
+    : `<div class="reward-ico">💙</div><h2>${t('thanksSv')}</h2>
+       <p class="muted">${t('thanksSvText')}</p>`;
+  $('#thanks').innerHTML += `<div class="row"><button class="btn btn-go" id="bHome"><span>${t('home')}</span></button></div>`;
   $('#bHome').onclick = resetHome;
   go('thanks');
   mascot('setMood', 'happy'); mascot('play', 'happy'); mascot('burst', 40);
-  setTimeout(() => say('ขอบคุณมากครับ 💛', 3000), 700);
+  setTimeout(() => say(t('sayThanks'), 3000), 700);
 }
 
 function countUp(el, to, ms) {
