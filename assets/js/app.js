@@ -1,7 +1,11 @@
 import { getQuiz, submitQuiz, checkPlayer, getStatus, submitSurvey, DEMO } from './api.js';
+import { themeOfToday } from './theme-day.js';
 
 const $ = (s) => document.querySelector(s);
 const CFG = window.DLTV_CONFIG || {};
+// ธีมของวัน: สลับ "ดาวเทียม DLTV" ↔ "ห้องเรียนฟองสบู่" ทุกวัน (ล็อกได้ใน config.js → THEME)
+const THEME = themeOfToday((window.DLTV_CONFIG || {}).THEME || 'auto');
+document.body.classList.add('theme-' + THEME);
 const S = { quiz: null, idx: 0, answers: {}, player: {}, startedAt: 0, busy: false, mascot: null };
 const LETTERS = ['ก', 'ข', 'ค', 'ง'];
 
@@ -12,7 +16,7 @@ async function initMascot() {
     const c = document.createElement('canvas');
     if (!(c.getContext('webgl2') || c.getContext('webgl'))) throw new Error('no webgl');
     const { Mascot } = await import('./mascot3d.js');
-    S.mascot = new Mascot(stage, { logoUrl: 'assets/img/dltv-logo.png' });
+    S.mascot = new Mascot(stage, { logoUrl: 'assets/img/dltv-logo.png', theme: THEME });
   } catch (e) {
     console.warn('3D not available, using image', e);
     stage.querySelector('.stage-fallback').hidden = false;
@@ -411,7 +415,9 @@ function countUp(el, to, ms) {
 const cf = $('#confetti'), cx = cf.getContext('2d'); let parts = [], cfRun = false;
 function confetti() {
   const W = (cf.width = innerWidth * devicePixelRatio), H = (cf.height = innerHeight * devicePixelRatio);
-  const cols = ['#fbb900', '#ffd54a', '#ffffff', '#3d4fc4', '#ef4444', '#17b26a', '#38bdf8'];
+  const cols = THEME === 'learning'
+    ? ['#ffb3d9', '#b5f0dc', '#cdb8ff', '#ffd6a5', '#a8d8ff', '#ffffff']
+    : ['#ffc21a', '#ffd966', '#ffffff', '#4f8cff', '#2f6bff', '#fff1b8'];
   for (let i = 0; i < 160; i++) {
     const fromLeft = i % 2 === 0; // ยิงจากมุมล่างซ้าย/ขวา เข้าหากลางจอ
     parts.push({ x: fromLeft ? 0 : W, y: H * 0.75, vx: (8 + Math.random() * 14) * (fromLeft ? 1 : -1) * devicePixelRatio, vy: -(14 + Math.random() * 16) * devicePixelRatio,
@@ -449,7 +455,7 @@ function cfTick() {
       g.globalAlpha = a; g.fillStyle = s.c;
       g.beginPath(); g.arc(s.x, (s.y - my * s.z * 0.3 * devicePixelRatio + H) % H, s.r, 0, 7); g.fill();
     });
-    if (!shoot && Math.random() < 0.004) shoot = { x: Math.random() * W * 0.7, y: Math.random() * H * 0.3, l: 0 };
+    if (!shoot && Math.random() < (THEME === 'satellite' ? 0.012 : 0.003)) shoot = { x: Math.random() * W * 0.7, y: Math.random() * H * 0.3, l: 0 };
     if (shoot) {
       shoot.l += 0.025; const len = 140 * devicePixelRatio, x = shoot.x + shoot.l * 500 * devicePixelRatio, y = shoot.y + shoot.l * 250 * devicePixelRatio;
       const gr = g.createLinearGradient(x, y, x - len, y - len / 2); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');

@@ -2,10 +2,10 @@
 // ใช้: const m = new Mascot(containerEl, { logoUrl });
 //      m.play('wave' | 'jump' | 'happy' | 'sad' | 'nod' | 'shake' | 'spin'); m.burst(); m.setMood('happy'|'sad'|'idle'); m.setSignal(speed)
 import * as THREE from 'three';
+import { THEMES, buildFx } from './mascot-themes.js';
 
 const YELLOW = 0xffc21a;
 const WHITE = 0xf7fdff;
-const PALETTE = ['#ffd23f', '#ff8a00', '#ff4fa3', '#a06bff', '#3de0ff', '#4ade80', '#ffffff'];
 
 const ease = {
   outBack: (t) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
@@ -47,10 +47,10 @@ function rainbowColors(geo, sat = 0.95, light = 0.6, offset = 0) {
 }
 
 // ฉากสีสำหรับเงาสะท้อน (ทำให้ผิวมันวาวสะท้อนสีสัน)
-function colorfulEnv(renderer) {
+function colorfulEnv(renderer, e) {
   const env = new THREE.Scene();
   const skyGeo = new THREE.SphereGeometry(10, 32, 16);
-  const cols = new Float32Array(skyGeo.attributes.position.count * 3), c = new THREE.Color(), top = new THREE.Color('#4a3cff'), mid = new THREE.Color('#1a1f6e'), bot = new THREE.Color('#ff3d9a');
+  const cols = new Float32Array(skyGeo.attributes.position.count * 3), c = new THREE.Color(), top = new THREE.Color(e.top), mid = new THREE.Color(e.mid), bot = new THREE.Color(e.bot);
   for (let i = 0; i < skyGeo.attributes.position.count; i++) {
     const y = skyGeo.attributes.position.getY(i) / 10;
     if (y > 0) c.copy(mid).lerp(top, y); else c.copy(mid).lerp(bot, -y * 0.8);
@@ -58,15 +58,12 @@ function colorfulEnv(renderer) {
   }
   skyGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   env.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true })));
-  const panel = (color, k, x, y, z, w, h) => {
+  const spots = [[2, 6, 5, 5, 3], [6, 1, 3, 3, 4], [-6, 2, 1, 3, 5], [2, -1, -7, 5, 3], [-4, 5, -4, 4, 3]];
+  e.panels.forEach(([color, k], i) => {
+    const [x, y, z, w, h] = spots[i];
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
     m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
-  };
-  panel('#ffffff', 6, 2, 6, 5, 5, 3);   // ไฟหลักด้านบน
-  panel('#ffd23f', 3, 6, 1, 3, 3, 4);   // เหลือง DLTV
-  panel('#ff4fa3', 3, -6, 2, 1, 3, 5);  // ชมพู
-  panel('#3de0ff', 3, 2, -1, -7, 5, 3); // ฟ้า
-  panel('#a06bff', 2.5, -4, 5, -4, 4, 3); // ม่วง
+  });
   const pm = new THREE.PMREMGenerator(renderer);
   const tex = pm.fromScene(env, 0.03).texture; pm.dispose();
   return tex;
@@ -83,6 +80,8 @@ export class Mascot {
     this.mood = 'idle';
     this.nextBlink = 1.5;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.themeName = THEMES[opts.theme] ? opts.theme : 'satellite';
+    this.th = THEMES[this.themeName];
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -92,16 +91,17 @@ export class Mascot {
     this.el.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.environment = colorfulEnv(this.renderer);
+    this.scene.environment = colorfulEnv(this.renderer, this.th.env);
 
     this.camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
     this.camera.position.set(0, 1.8, 10);
 
     const key = new THREE.DirectionalLight(0xfff4e0, 1.7); key.position.set(3, 5, 6); this.scene.add(key);
-    this.rimPink = new THREE.DirectionalLight(0xff4fa3, 1.3); this.rimPink.position.set(-5, 2, -3); this.scene.add(this.rimPink);
-    this.rimCyan = new THREE.DirectionalLight(0x3de0ff, 1.6); this.rimCyan.position.set(5, 1, -3); this.scene.add(this.rimCyan);
-    const fill = new THREE.DirectionalLight(0xa06bff, 0.8); fill.position.set(-3, -2, 5); this.scene.add(fill);
-    this.scene.add(new THREE.HemisphereLight(0xe8ecff, 0x3a3a8a, 0.7));
+    // ไฟขอบสีตามธีม
+    this.rimPink = new THREE.DirectionalLight(this.th.rimA, 1.5); this.rimPink.position.set(-5, 2, -3); this.scene.add(this.rimPink);
+    this.rimCyan = new THREE.DirectionalLight(this.th.rimB, 1.4); this.rimCyan.position.set(5, 1, -3); this.scene.add(this.rimCyan);
+    const fill = new THREE.DirectionalLight(this.th.fill, 0.7); fill.position.set(-3, -2, 5); this.scene.add(fill);
+    this.scene.add(new THREE.HemisphereLight(this.th.hemi[0], this.th.hemi[1], 0.7));
 
     this.build();
     this.bind();
@@ -210,46 +210,19 @@ export class Mascot {
 
     this.waves = [];
     const waveOrigin = dir.clone().multiplyScalar(1.22);
-    ['#ffd23f', '#ff8a00', '#ff4fa3'].forEach((c, i) => {
+    this.th.waves.forEach((c, i) => {
       const w = M(new THREE.TorusGeometry(0.22 + i * 0.17, 0.038, 8, 32, 1.5),
         new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(1.3), transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
       w.position.copy(waveOrigin); w.position.z = 0.2; w.rotation.z = -0.15;
       head.add(w); this.waves.push(w);
     });
 
-    // ---------- เอฟเฟกต์รอบตัว ----------
-    // แสงฟุ้งด้านหลัง
-    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-    this.halo.position.set(0, 2.0, -1.5); this.halo.scale.set(3.4, 3.4, 1); this.scene.add(this.halo);
-
-    // วงโคจรสีรุ้ง + ดาวเคราะห์จิ๋ว
-    this.orbits = [];
-    [[1.45, 1.32, 0.3, 0.0, '#3de0ff'], [1.7, 1.18, -0.45, 0.5, '#ff4fa3']].forEach(([r, tx, tz, off, pc], i) => {
-      const g = new THREE.Group(); g.position.y = 1.05; g.rotation.set(tx, 0, tz);
-      const ring = M(rainbowColors(new THREE.TorusGeometry(r, 0.014, 6, 160), 1, 0.62, off),
-        new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, toneMapped: false }));
-      g.add(ring);
-      const planet = M(new THREE.SphereGeometry(i ? 0.09 : 0.11, 20, 16), new THREE.MeshPhysicalMaterial({ color: pc, emissive: pc, emissiveIntensity: 0.6, roughness: 0.3, clearcoat: 1 }));
-      g.add(planet);
-      this.root.add(g); this.orbits.push({ g, planet, r, speed: i ? -0.7 : 0.9, a: i * 2 });
-    });
-
-    // พื้นวงแหวนเรืองแสง
-    this.pad = M(rainbowColors(new THREE.RingGeometry(0.72, 0.82, 96)), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
-    this.pad.rotation.x = -Math.PI / 2; this.pad.position.y = 0.012; this.scene.add(this.pad);
+    // ---------- เงา + เอฟเฟกต์รอบตัว (ตามธีมของวัน) ----------
     this.shadow = M(new THREE.PlaneGeometry(1.8, 0.7), new THREE.MeshBasicMaterial({ map: shadowTex(), transparent: true, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2; this.shadow.position.y = 0.01; this.scene.add(this.shadow);
-
-    // ประกายดาวระยิบระยับ
     this.sparkTex = sparkleTex();
-    this.sparkles = [];
-    for (let i = 0; i < 34; i++) {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.sparkTex, color: PALETTE[i % PALETTE.length], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-      const a = Math.random() * Math.PI * 2, r = 1.4 + Math.random() * 1.1;
-      s.userData = { a, r, y: 0.2 + Math.random() * 3.3, sp: 0.1 + Math.random() * 0.25, tw: 1 + Math.random() * 3, ph: Math.random() * 6, size: 0.12 + Math.random() * 0.22 };
-      this.scene.add(s); this.sparkles.push(s);
-    }
     this.bursts = [];
+    this.fx = buildFx(this, this.themeName);
 
     this.root.scale.setScalar(0.001); // โผล่ขึ้นมาตอนเริ่ม
     this.intro = 0;
@@ -295,12 +268,15 @@ export class Mascot {
   setSignal(speed) { this.signalSpeed = speed; }
   setMood(m) { this.mood = m; this.mouth.visible = m !== 'sad'; this.mouthSad.visible = m === 'sad'; }
   /** ระเบิดประกายดาวออกจากตัวน้อง */
-  burst(n = 40) {
+  burst(n = 40, from = null, palette = null) {
+    const pal = palette || this.th.palette;
+    if (!from && this.fx) this.fx.burst(n);
     for (let i = 0; i < n; i++) {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.sparkTex, color: PALETTE[(Math.random() * PALETTE.length) | 0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-      s.position.set(0, 2 + this.root.position.y, 0.3);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.sparkTex, color: pal[(Math.random() * pal.length) | 0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+      if (from) s.position.copy(from); else s.position.set(0, 2 + this.root.position.y, 0.3);
       const a = Math.random() * Math.PI * 2, up = Math.random();
-      s.userData = { v: new THREE.Vector3(Math.cos(a) * (1.5 + Math.random() * 2.5), 1.5 + up * 3.5, Math.sin(a) * 1.5), life: 0, max: 1 + Math.random() * 0.6, size: 0.15 + Math.random() * 0.25 };
+      const k = from ? 0.35 : 1; // ฟองแตก = กระจายเบา ๆ
+      s.userData = { v: new THREE.Vector3(Math.cos(a) * (1.5 + Math.random() * 2.5) * k, (1.5 + up * 3.5) * k, Math.sin(a) * 1.5 * k), life: 0, max: (1 + Math.random() * 0.6) * (from ? 0.6 : 1), size: (0.15 + Math.random() * 0.25) * (from ? 0.6 : 1) };
       this.scene.add(s); this.bursts.push(s);
     }
   }
@@ -370,7 +346,7 @@ export class Mascot {
       w.material.opacity = 0.15 + 0.85 * Math.max(0, Math.sin(ph * Math.PI));
       w.scale.setScalar(0.92 + 0.1 * ph);
     });
-    this.antBall.material.color.setHSL((t * 0.15) % 1, 1, 0.62).multiplyScalar(1.4);
+    this.antBall.material.color.set(this.th.ant(t)).multiplyScalar(1.4);
     this.antBall.scale.setScalar(1 + 0.2 * Math.max(0, Math.sin(t * sp * Math.PI * 2)));
     this.leds.forEach((l, i) => l.scale.setScalar(0.7 + 0.5 * Math.max(0, Math.sin(t * 5 + i * 2))));
 
@@ -378,26 +354,11 @@ export class Mascot {
     this.rimPink.position.set(Math.cos(t * 0.6) * -5, 2 + Math.sin(t * 0.8), Math.sin(t * 0.6) * -4);
     this.rimCyan.position.set(Math.cos(t * 0.6 + 2) * 5, 1 + Math.sin(t * 0.7), Math.sin(t * 0.6 + 2) * -4);
 
-    // วงโคจร / ฮาโล / พื้น
-    this.orbits.forEach((o) => {
-      o.a += dt * o.speed * (this.signalSpeed > 1 ? 2.5 : 1);
-      o.planet.position.set(Math.cos(o.a) * o.r, Math.sin(o.a) * o.r, 0);
-      o.g.rotation.y += dt * 0.15;
-    });
-    this.halo.material.opacity = 0.35 + 0.12 * Math.sin(t * 1.6);
-    this.halo.material.rotation = t * 0.1;
-    this.pad.rotation.z = t * 0.8;
+    // เงา + เอฟเฟกต์ของธีม
     const s = 1 - Math.min(y, 0.8) * 0.5;
     this.shadow.scale.set(s, s, s); this.shadow.material.opacity = 0.9 * s;
-    this.pad.material.opacity = 0.45 + 0.3 * s;
+    this.fx.update(t, dt, s);
 
-    // ประกายดาว
-    this.sparkles.forEach((p) => {
-      const u = p.userData; u.a += dt * u.sp;
-      p.position.set(Math.cos(u.a) * u.r, u.y + Math.sin(t * 0.8 + u.ph) * 0.15, Math.sin(u.a) * u.r * 0.6 - 0.2);
-      const tw = Math.max(0, Math.sin(t * u.tw + u.ph)); p.scale.setScalar(u.size * (0.3 + tw));
-      p.material.opacity = 0.25 + 0.75 * tw;
-    });
     this.bursts = this.bursts.filter((p) => {
       const u = p.userData; u.life += dt;
       u.v.y -= 6 * dt; p.position.addScaledVector(u.v, dt);

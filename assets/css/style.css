@@ -323,3 +323,21 @@ body[data-screen="survey"] .survey{margin-top:126px}
 .reg-label{margin:4px 0 6px;font-weight:600;color:var(--navy)}
 #phoneField{margin-top:10px}
 #phoneField.optional input{border-style:dashed}
+
+/* ---------- ธีมของวัน ---------- */
+/* A: ดาวเทียม DLTV — เหลืองทอง/น้ำเงิน */
+body.theme-satellite{background:radial-gradient(90% 60% at 15% 0%,#2f5bd6 0%,transparent 60%),radial-gradient(80% 60% at 100% 30%,#16348f 0%,transparent 55%),
+  radial-gradient(120% 80% at 50% -10%,#24359e 0%,#121a5e 45%,#070c33 100%) fixed}
+body.theme-satellite .nebula{background:radial-gradient(28% 22% at 20% 35%,rgba(255,194,26,.22),transparent 70%),radial-gradient(35% 30% at 85% 70%,rgba(79,140,255,.35),transparent 70%),
+  radial-gradient(30% 25% at 70% 12%,rgba(255,217,102,.18),transparent 70%),radial-gradient(30% 25% at 10% 85%,rgba(47,107,255,.35),transparent 70%)}
+body.theme-satellite{--rainbow:linear-gradient(90deg,#ffe066,#ffc21a,#ffd966,#6aa8ff,#2f6bff)}
+body.theme-satellite .title span{background-image:linear-gradient(90deg,#ffe066,#ffc21a,#fff1b8,#ffc21a)}
+body.theme-satellite .stage-ring{background:radial-gradient(closest-side,rgba(255,194,26,.35),rgba(79,140,255,.18) 55%,transparent)}
+/* B: ห้องเรียนฟองสบู่ — พาสเทล */
+body.theme-learning{background:radial-gradient(90% 60% at 15% 0%,#7b62d6 0%,transparent 60%),radial-gradient(80% 60% at 100% 30%,#c9659f 0%,transparent 55%),
+  radial-gradient(120% 80% at 50% -10%,#3e46a8 0%,#232a72 45%,#121641 100%) fixed}
+body.theme-learning .nebula{background:radial-gradient(28% 22% at 20% 35%,rgba(255,214,165,.3),transparent 70%),radial-gradient(35% 30% at 85% 70%,rgba(142,240,208,.28),transparent 70%),
+  radial-gradient(30% 25% at 70% 12%,rgba(255,158,207,.35),transparent 70%),radial-gradient(30% 25% at 10% 85%,rgba(205,184,255,.4),transparent 70%)}
+body.theme-learning{--rainbow:linear-gradient(90deg,#ffd6a5,#ffb3d9,#cdb8ff,#a8d8ff,#b5f0dc)}
+body.theme-learning .title span{background-image:linear-gradient(90deg,#ffd6a5,#ffb3d9,#cdb8ff,#ffd6a5)}
+body.theme-learning .stage-ring{background:radial-gradient(closest-side,rgba(255,158,207,.35),rgba(142,240,208,.18) 55%,transparent)}
